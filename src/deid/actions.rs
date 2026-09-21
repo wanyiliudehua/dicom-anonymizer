@@ -22,6 +22,7 @@ const DATE_TAGS: &[Tag] = &[
     Tag(0x0008, 0x0021), // Series Date
     Tag(0x0008, 0x0022), // Acquisition Date
     Tag(0x0008, 0x0023), // Content Date
+    Tag(0x0008, 0x002A), // Acquisition DateTime
     Tag(0x0008, 0x0030), // Study Time
 ];
 
@@ -53,21 +54,26 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
             continue;
         }
 
+        let action = rules.get(&tag).copied();
+
+        // An explicit X removes the element as a whole — including a sequence.
+        if action == Some(Action::X) {
+            if ds::remove(obj, tag) {
+                changed += 1;
+            }
+            continue;
+        }
+
+        // Unruled / non-X sequences are recursed into rather than removed.
         if is_seq {
             changed += apply_to_sequence(obj, tag, ctx)?;
             continue;
         }
 
-        let Some(&action) = rules.get(&tag) else {
+        let Some(action) = action else {
             continue;
         };
         if action == Action::K {
-            continue;
-        }
-        if action == Action::X {
-            if ds::remove(obj, tag) {
-                changed += 1;
-            }
             continue;
         }
 
@@ -279,8 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn private_tags_removed_by_default_and_kept_with_option() {
-        let mk = |retain: bool| {
+    fn private_tags_removed_by_default_and_kept_with_option() {        let mk = |retain: bool| {
             Config::from_toml_str(&format!(
                 "[dates]\nstrategy = \"zero\"\n[profile]\nretain_safe_private = {retain}\n"
             ))
@@ -308,5 +313,51 @@ mod tests {
         )]);
         apply(&mut o2, &c2).unwrap();
         assert!(o2.element(Tag(0x0009, 0x0010)).is_ok());
+    }
+
+    #[test]
+    fn sequence_with_x_rule_is_removed_whole() {
+        use dicom_core::value::DataSetSequence;
+        let cfg = Config::from_toml_str("[dates]\nstrategy = \"zero\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let inner = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0040, 0x0006),
+            VR::PN,
+            "Dr^Who",
+        )]);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0040, 0x0275),
+            VR::SQ,
+            DataSetSequence::from(vec![inner]),
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert!(
+            o.element(Tag(0x0040, 0x0275)).is_err(),
+            "a sequence with an X rule must be removed as a whole"
+        );
+    }
+
+    #[test]
+    fn unruled_sequence_is_kept_and_recursed() {
+        use dicom_core::value::DataSetSequence;
+        let cfg = Config::from_toml_str("[dates]\nstrategy = \"zero\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let inner = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x1155),
+            VR::UI,
+            "1.2.3",
+        )]);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x1140),
+            VR::SQ,
+            DataSetSequence::from(vec![inner]),
+        )]);
+        apply(&mut o, &c).unwrap();
+        // unruled sequence is kept (recursed into, not removed)
+        assert!(o.element(Tag(0x0008, 0x1140)).is_ok());
     }
 }
