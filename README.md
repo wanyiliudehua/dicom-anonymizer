@@ -184,6 +184,12 @@ are skipped. Burned-in masking uses configured regions only; there is no OCR.
 With the default random salts, results are not reproducible across runs; set
 `dates.shift_salt` and `uids.salt` for reproducibility.
 
+Very large single files are refused rather than attempted. `[limits] max_input_bytes`
+(default 2 GiB, `0` disables) turns any larger input into a per-file `error` *before it
+is read*: peak memory is a multiple of the file size times the number of jobs in flight,
+and being killed part-way through a batch leaves a partial tree. Use `--jobs 1` to bound
+the multiplier, or raise the limit if you really mean to process something enormous.
+
 A source file that carries non-ASCII text while declaring **no** `SpecificCharacterSet`
 is not conformant, but it is handled rather than rejected: the bytes are decoded
 single-byte and re-encoded the same way, so the text survives byte-for-byte (verified by

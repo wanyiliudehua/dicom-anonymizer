@@ -642,6 +642,71 @@ fn verify_reports_the_run_manifest() {
 }
 
 #[test]
+fn an_input_over_the_size_limit_is_a_loud_error() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[limits]\nmax_input_bytes = 10\n").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .failure();
+
+    // Loud, not a quiet skip: an un-anonymised file must fail the run and be recorded.
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"error\""), "{audit}");
+    assert!(audit.contains("max_input_bytes"), "{audit}");
+
+    // Nothing was written for it.
+    let stray: Vec<String> = std::fs::read_dir(out.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n != "run.json" && !n.ends_with(".jsonl"))
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "nothing should have been written: {stray:?}"
+    );
+
+    // And the marker must not claim the tree is complete.
+    let marker = std::fs::read_to_string(out.path().join("run.json")).unwrap();
+    assert!(marker.contains("\"outcome\": \"partial\""), "{marker}");
+}
+
+#[test]
+fn a_zero_size_limit_disables_the_guard() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[limits]\nmax_input_bytes = 0\n").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

@@ -34,6 +34,9 @@ on_missing_burnedin = "warn"         # warn | skip | mask_all
 filename = "sop_instance_uid"        # sop_instance_uid | preserve
 layout = "mirror"                   # mirror | series (one dir per remapped series UID)
 
+[limits]
+max_input_bytes = 2147483648         # refuse larger inputs (0 = no limit)
+
 # [[pixels.regions]]
 # modality = "US"
 # shape = "rect"

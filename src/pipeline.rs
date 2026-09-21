@@ -81,6 +81,27 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         return Ok(rec);
     }
 
+    // Refuse oversized inputs before reading them. The failure being guarded against
+    // is the process being killed part-way through a batch, which leaves a partial
+    // tree; one loud per-file error is strictly better, and is not a silent skip.
+    let limit = shared.cfg.limits.max_input_bytes;
+    if limit > 0 {
+        if let Ok(meta) = std::fs::metadata(&job.input) {
+            if meta.len() > limit {
+                let rec = Record::error(
+                    input_str,
+                    format!(
+                        "input is {} bytes, over limits.max_input_bytes ({limit}); \
+                         raise the limit or process this file separately",
+                        meta.len()
+                    ),
+                );
+                emit(log, &rec);
+                return Ok(rec);
+            }
+        }
+    }
+
     let mut obj = match dicom_object::open_file(&job.input) {
         Ok(o) => o,
         Err(e) => {

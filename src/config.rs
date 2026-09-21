@@ -295,6 +295,30 @@ impl Default for FillValue {
     }
 }
 
+/// Hard limits that keep a run from exhausting the machine.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct Limits {
+    /// Refuse any input larger than this many bytes and record a per-file error
+    /// instead of processing it. `0` disables the guard.
+    ///
+    /// This is a per-file guard, not a total budget: peak memory is a multiple of the
+    /// file size (the object, the transcoded pixels and the serialised output all live
+    /// at once) multiplied by the number of jobs in flight.
+    pub max_input_bytes: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        // A single DICOM this large is already exceptional, and the failure it guards
+        // against - the process being killed part way through a batch - is worse than
+        // refusing one file loudly.
+        Limits {
+            max_input_bytes: 2 * 1024 * 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
@@ -303,6 +327,7 @@ pub struct Config {
     pub uids: Uids,
     pub pixels: Pixels,
     pub output: Output,
+    pub limits: Limits,
     pub tags: BTreeMap<String, Action>,
     pub dummies: BTreeMap<String, String>,
 }
@@ -481,6 +506,16 @@ mod tests {
     fn rejects_invalid_uid_root_when_remapping() {
         let c = Config::from_toml_str("[uids]\nstrategy = \"remap\"\nroot = \"abc\"\n").unwrap();
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn size_limit_defaults_to_two_gib_and_parses() {
+        let c = Config::from_toml_str("").unwrap();
+        assert_eq!(c.limits.max_input_bytes, 2 * 1024 * 1024 * 1024);
+        let c2 = Config::from_toml_str("[limits]\nmax_input_bytes = 1024\n").unwrap();
+        assert_eq!(c2.limits.max_input_bytes, 1024);
+        let c3 = Config::from_toml_str("[limits]\nmax_input_bytes = 0\n").unwrap();
+        assert_eq!(c3.limits.max_input_bytes, 0, "0 means unlimited");
     }
 
     #[test]

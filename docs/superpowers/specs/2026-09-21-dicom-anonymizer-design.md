@@ -177,6 +177,14 @@ salt = ""                              # empty => random per run
 
 [output]
 filename = "sop_instance_uid"          # sop_instance_uid | preserve
+layout = "mirror"                     # mirror | series (one dir per remapped series UID)
+
+[limits]
+max_input_bytes = 2147483648           # refuse larger inputs (0 = no limit)
+layout = "mirror"                     # mirror | series (one dir per remapped series UID)
+
+[limits]
+max_input_bytes = 2147483648           # refuse larger inputs (0 = no limit)
 
 [dummies]
 # optional overrides for the D action; unspecified tags use built-in defaults
@@ -480,6 +488,11 @@ dicom-anonymizer/
   character) and written back through the same codec, which reproduces the original bytes
   exactly (verified by test on a hand-built fixture). Cleaning runs on that same decoding
   so it still matches, but the output stays exactly as ambiguous as the input.
+- **Memory is proportional to the largest files, times the jobs in flight.** Each file
+  is read, de-identified, transcoded and serialised whole, so peak usage is several times
+  the file size multiplied by the number of parallel jobs. `[limits] max_input_bytes`
+  (default 2 GiB, `0` disables) refuses an oversized input *before reading it* as a
+  per-file error; `--jobs 1` bounds the multiplier. There is no streaming reader.
 - **`PlanarConfiguration = 1`** files are rejected when masking is needed.
 - **DICOMDIR** is skipped, so media directory indexes are not updated.
 - **Machine-specific build**: this host has no working MinGW `dlltool` and no MSVC
@@ -556,6 +569,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   space: `split_whitespace` counts NEL (U+0085) and NBSP as whitespace, and those are
   exactly what undeclared single-byte text decodes to. `C` now trims only leading/trailing
   ASCII spaces and `^` and rewrites nothing else.
+- **`[limits] max_input_bytes`** was added beyond the plan after the memory profile was
+  written down: nothing stopped a single huge input from exhausting the machine and
+  getting the process killed mid-batch. It is a per-file guard checked before the file is
+  read, and it fails loudly (a per-file error, which makes `run.json` say `partial`) rather
+  than skipping quietly, because a quietly skipped file would be an un-anonymised file.
 - **`run.json` completion marker** was added beyond the plan. The audit log is created
   before processing starts, so nothing in a partial tree distinguished a killed run from a
   finished one; the marker supplies exactly that evidence, and `--verify` reports it.

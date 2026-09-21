@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `[limits] max_input_bytes`, a guard against exhausting memory (default 2 GiB, `0`
+  disables). Each file is held whole, so peak usage is several times the largest file size
+  times the jobs in flight; an oversized input is now refused **before it is read** and
+  recorded as a per-file error saying the actual size and the remedy. Deliberately loud
+  rather than a quiet skip, since a skipped file would be an un-anonymised file.
 - `run.json`, a completion marker written into the output root at the end of a run.
   `audit.jsonl` exists from before the first file is processed, so a killed run leaves a
   partial tree that is indistinguishable from a finished product; the marker's presence is
