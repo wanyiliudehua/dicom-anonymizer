@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`[tags]` could override structural tags.** A user override is applied last, so
+  `"7FE0,0010" = "X"` removed Pixel Data and broke the pixel stage, and `"0008,0016" = "X"`
+  produced a file nothing can open. `validate()` now refuses overrides of `REQUIRED_TAGS`
+  (SOP Class UID, Burned In Annotation, Pixel Data) with a clean exit `2`:
+  `tags.7FE0,0010 may not be overridden: the run needs it`. Policy tags such as Manufacturer
+  remain overridable — these are structural, not policy.
 - **An explicitly enabled option was silently overridden by `conservative`.** The strategy
   was applied as an overlay after option resolution, so `strategy = "conservative"` with
   `retain_longitudinal_temporal = true` kept dates **verbatim** instead of shifting them:

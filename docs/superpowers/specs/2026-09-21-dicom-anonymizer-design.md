@@ -75,7 +75,7 @@ Data flow per file (parallelizable):
 ```
 open file (or log skipped if not DICOM)
   -> skip if DICOMDIR
-  -> resolve rules (E.1-1 + enabled options + strategy overlay + user [tags])
+  -> resolve rules (E.1-1 + enabled options + strategy default + user [tags])
   -> determine original PatientID (for the date offset)
   -> apply actions (X/Z/D/U/C/K), recursing sequences (X removes an SQ whole)
   -> sync file meta Media Storage SOP Instance UID
@@ -217,8 +217,10 @@ frames = "all"                         # all | [0, 1, 2]
 "0010,0010" = "Z"
 ```
 
-**Merge precedence:** user `[tags]` > strategy overlay > enabled options > E.1-1 Basic >
-built-in overrides.
+**Merge precedence:** user `[tags]` > enabled options > strategy default > E.1-1 Basic >
+built-in overrides. Structural tags (`0008,0016` SOP Class UID, `0028,0301` Burned In
+Annotation, `7FE0,0010` Pixel Data) may not be overridden (`REQUIRED_TAGS`): removing them
+breaks the pixel stage or produces a file nothing can open, which is not a policy choice.
 
 **Presets:** `ps3.15-basic` (no options) and `research` (basic + `retain_longitudinal_temporal`
 + `retain_safe_private`).
@@ -639,6 +641,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Progress reporting** was added beyond the plan: a batch can run for hours, and the
   only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
   a terminal, so redirected output stays byte-identical to before.
+- **`[tags]` may no longer override structural tags.** `[tags]` is applied last, so a
+  `"7FE0,0010" = "X"` entry could remove Pixel Data and break the pixel stage (or produce a
+  file nothing can open). `Config::validate` now rejects overrides of `REQUIRED_TAGS`
+  (SOP Class UID, Burned In Annotation, Pixel Data) with exit 2, leaving policy tags such as
+  Manufacturer overridable.
 - **An explicitly enabled option now wins over the strategy.** `conservative` used to be
   applied as an overlay *after* option resolution, so `strategy = "conservative"` with
   `retain_longitudinal_temporal = true` produced verbatim dates rather than shifted ones -

@@ -50,6 +50,7 @@ max_parallel_bytes = 1073741824      # cap jobs x largest input (0 = no cap)
 
 # [tags]
 # "0010,0010" = "Z"
+# Structural tags (SOP Class UID, Burned In Annotation, Pixel Data) cannot be overridden.
 
 # [dummies]
 # "0008,0070" = "ANON"

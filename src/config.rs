@@ -234,6 +234,19 @@ pub struct Dates {
 /// `DateShifter::offset_for` computes `2 * range_days + 1`; without a bound an absurd
 /// value overflows (panic in debug, silent wrap in release) instead of being a config
 /// error. 36500 days is a century, which is already far beyond any real date range.
+/// Tags a user `[tags]` override may not touch.
+///
+/// `effective_rules` applies `[tags]` last, so without this a user could remove the SOP
+/// Class UID, the Burned In Annotation flag, or Pixel Data itself - breaking the pixel stage
+/// or producing a file nothing can open. Those are structural rather than policy, and the
+/// `[tags]` table exists to change policy. Kept in step with the `K` entries of
+/// `deid::profile::OVERRIDES`, which pin them for the same reason.
+pub const REQUIRED_TAGS: &[&str] = &[
+    "0008,0016", // SOP Class UID - identifies the IOD
+    "0028,0301", // Burned In Annotation - decides whether masking is needed
+    "7FE0,0010", // Pixel Data - never a tag action
+];
+
 pub const MAX_RANGE_DAYS: i64 = 36500;
 
 impl Default for Dates {
@@ -499,7 +512,12 @@ impl Config {
             }
         }
         for k in self.tags.keys() {
-            parse_tag(k)?;
+            let tag = parse_tag(k)?;
+            if REQUIRED_TAGS.iter().any(|r| parse_tag(r).ok() == Some(tag)) {
+                return Err(AnonError::Config(format!(
+                    "tags.{k} may not be overridden: the run needs it"
+                )));
+            }
         }
         Ok(())
     }
@@ -557,6 +575,26 @@ mod tests {
     fn rejects_invalid_uid_root_when_remapping() {
         let c = Config::from_toml_str("[uids]\nstrategy = \"remap\"\nroot = \"abc\"\n").unwrap();
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_overrides_of_tags_the_run_requires() {
+        // A [tags] override is applied last, so it could remove the SOP Class UID, the
+        // Burned In Annotation flag, or Pixel Data itself - breaking the pixel stage or
+        // producing a file nothing can open. Those are not policy choices a user should be
+        // able to make by accident, so they are refused at load time.
+        for t in ["7FE0,0010", "0008,0016", "0028,0301"] {
+            let c = Config::from_toml_str(&format!("[tags]\n\"{t}\" = \"X\"\n")).unwrap();
+            assert!(c.validate().is_err(), "{t} must not be overridable");
+        }
+        // ... while ordinary attributes remain overridable.
+        let ok = Config::from_toml_str("[tags]\n\"0010,0010\" = \"K\"\n").unwrap();
+        assert!(ok.validate().is_ok());
+        let ok2 = Config::from_toml_str("[tags]\n\"0008,0070\" = \"K\"\n").unwrap();
+        assert!(
+            ok2.validate().is_ok(),
+            "Manufacturer is policy, not structure"
+        );
     }
 
     #[test]
