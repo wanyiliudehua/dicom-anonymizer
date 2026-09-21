@@ -358,6 +358,27 @@ One object per walked file:
 - `regions_masked` counts mask operations; `samples_masked` counts written samples.
 - In `--dry-run`, records go to stdout and `output`/`output_sha256` may be null.
 
+### Completion marker (`run.json`)
+
+`audit.jsonl` is opened before the first file is processed, so a run that is killed
+leaves a partial audit and a partial output tree that are indistinguishable from a
+finished product. The marker written at the end of a run is what separates them:
+
+```json
+{ "tool": "dicom-anonymizer", "version": "0.1.0", "outcome": "complete",
+  "total": 70, "ok": 69, "skipped": 1, "unsupported": 0, "error": 0,
+  "audit_complete": true }
+```
+
+- Absence means the run did not reach the end.
+- `outcome` is `complete` only when `error == 0`, otherwise `partial`: the run finished,
+  but at least one file was not written.
+- `audit_complete` is `false` when a write to the audit sink failed, so records may be
+  missing even though the marker exists.
+- `--dry-run` writes none, because it produces no tree.
+- `--verify` reports the marker when present (`manifest: outcome=Complete …`) and states
+  its absence otherwise; a tree produced elsewhere simply has none, which is not an error.
+
 ## 13. Error handling and exit codes
 
 - Per-file errors are recorded as `status = error` and do not stop the batch unless
@@ -482,6 +503,8 @@ dicom-anonymizer/
    release archives and attaches them to a GitHub Release.
 8. `--check-leaks` re-reads the input tree, scans the output tree, reports 0 hits on a
    clean run, and exits `1` naming file/tag/identifier when an identifier survives.
+9. A finished run leaves `<out>/run.json` with `outcome = complete`; a run that leaves a
+   file un-anonymised records `partial`; `--dry-run` writes no marker.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -533,6 +556,9 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   space: `split_whitespace` counts NEL (U+0085) and NBSP as whitespace, and those are
   exactly what undeclared single-byte text decodes to. `C` now trims only leading/trailing
   ASCII spaces and `^` and rewrites nothing else.
+- **`run.json` completion marker** was added beyond the plan. The audit log is created
+  before processing starts, so nothing in a partial tree distinguished a killed run from a
+  finished one; the marker supplies exactly that evidence, and `--verify` reports it.
 - **`--verify` / `--export-identifiers`** were added beyond the plan, completing
   `--check-leaks` into a workflow that works without the originals. The exported artefact
   is deliberately a salted hash set rather than a plaintext identifier list, so the tool

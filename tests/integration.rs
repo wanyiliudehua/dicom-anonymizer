@@ -555,6 +555,93 @@ fn text_without_a_declared_character_set_round_trips_and_is_still_cleaned() {
 }
 
 #[test]
+fn a_finished_run_marks_the_tree_as_complete() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    std::fs::write(src.path().join("notes.txt"), b"not dicom").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .assert()
+        .success();
+
+    let marker = std::fs::read_to_string(out.path().join("run.json")).unwrap();
+    assert!(marker.contains("\"outcome\": \"complete\""), "{marker}");
+    assert!(marker.contains("\"total\": 2"), "{marker}");
+    assert!(marker.contains("\"skipped\": 1"), "{marker}");
+    assert!(marker.contains("\"audit_complete\": true"), "{marker}");
+}
+
+#[test]
+fn an_unwritable_file_marks_the_tree_as_partial() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("good.dcm"), "Doe^John", "1.2.3");
+    common::write_broken_dicom(&src.path().join("bad.dcm"));
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .assert()
+        .failure();
+
+    let marker = std::fs::read_to_string(out.path().join("run.json")).unwrap();
+    assert!(
+        marker.contains("\"outcome\": \"partial\""),
+        "a run that left a file un-anonymised must not claim to be complete: {marker}"
+    );
+    assert!(marker.contains("\"error\": 1"), "{marker}");
+}
+
+#[test]
+fn verify_reports_the_run_manifest() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(out.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("manifest: outcome=Complete"));
+
+    // A tree without the marker says so instead of pretending.
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .stderr(predicate::str::contains("manifest: none"));
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

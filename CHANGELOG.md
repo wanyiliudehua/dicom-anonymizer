@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `run.json`, a completion marker written into the output root at the end of a run.
+  `audit.jsonl` exists from before the first file is processed, so a killed run leaves a
+  partial tree that is indistinguishable from a finished product; the marker's presence is
+  the difference. It records `outcome` (`complete`/`partial`), every status count, and
+  whether the audit sink kept up. `--verify` reports it when present and says so when it
+  is absent. `--dry-run` writes no marker, having no tree.
 - `--export-identifiers FILE` and `--verify FILE`: record what was identifying as a
   **salted fingerprint** (hashes plus lengths, never a name) while anonymising, then later
   verify a tree against it with no need for the original data, config or output tree.

@@ -183,17 +183,30 @@ fn run() -> i32 {
         "ok={} skipped={} unsupported={} error={}",
         summary.ok, summary.skipped, summary.unsupported, summary.error
     );
-    if audit_failed {
-        return 1;
-    }
+
+    let mut leak_failed = false;
     if args.check_leaks {
         if args.dry_run {
             eprintln!(
                 "note: --check-leaks needs an output tree, and --dry-run writes none; skipping"
             );
         } else if !check_leaks(&args.input, &output, &shared.cfg) {
+            leak_failed = true;
+        }
+    }
+
+    // Mark the tree as finished. Written last, and never in dry-run (which produces
+    // no tree), so its presence means the run reached the end.
+    if !args.dry_run {
+        let manifest = report::Manifest::new(&summary, jobs.len(), !audit_failed);
+        if let Err(e) = manifest.write(&output) {
+            eprintln!("error: cannot write {}: {e}", report::MANIFEST_FILE);
             return 1;
         }
+    }
+
+    if audit_failed || leak_failed {
+        return 1;
     }
     summary.exit_code()
 }
@@ -284,6 +297,19 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
             return 2;
         }
     };
+    // A tree nobody here produced may have no marker; that is worth saying, not failing.
+    match report::Manifest::load(input) {
+        Ok(Some(m)) => eprintln!(
+            "manifest: outcome={:?} total={} ok={} skipped={} unsupported={} error={} audit_complete={}",
+            m.outcome, m.total, m.ok, m.skipped, m.unsupported, m.error, m.audit_complete
+        ),
+        Ok(None) => eprintln!(
+            "manifest: none (no {}) - the tree may be incomplete or produced elsewhere",
+            report::MANIFEST_FILE
+        ),
+        Err(e) => eprintln!("manifest: unreadable: {e}"),
+    }
+
     let hits = match verify::scan_fingerprint(input, &fp) {
         Ok(h) => h,
         Err(e) => {

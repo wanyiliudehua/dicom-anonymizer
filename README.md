@@ -90,6 +90,21 @@ one series that share a file name would collide; prefer the default UID naming t
 `audit.jsonl` in
 the output directory has one JSON object per file (status, changed tag count,
 `regions_masked` and `samples_masked`, transfer syntaxes, output SHA-256).
+
+At the end of a run the tool also writes `run.json`:
+
+```json
+{ "tool": "dicom-anonymizer", "version": "0.1.0", "outcome": "complete",
+  "total": 70, "ok": 69, "skipped": 1, "unsupported": 0, "error": 0,
+  "audit_complete": true }
+```
+
+`audit.jsonl` is created before processing starts, so a killed run leaves a partial audit
+and a partial output tree that look no different from a finished product. **`run.json` is
+the marker that separates the two: if it is absent, the run did not finish.** `outcome`
+is `partial` when any file was left un-anonymised, and `audit_complete` is `false` when
+the audit sink itself failed, so records may be missing. `--verify` prints the marker
+when it finds one, and says so when it does not.
 Non-DICOM files are logged with `status: skipped`; a file whose transfer syntax
 cannot be decoded (e.g. JPEG-LS without `--features charls`) is logged with
 `status: unsupported` and the batch continues. Exit codes: `0` success,

@@ -7,6 +7,16 @@ pub fn write_fixture(path: &Path, name: &str, study_uid: &str) {
     write_fixture_extra(path, name, study_uid, &[]);
 }
 
+/// A file that looks like DICOM (valid `DICM` magic) but cannot be parsed, for
+/// exercising per-file error handling and the `partial` run outcome.
+pub fn write_broken_dicom(path: &Path) {
+    let mut v = vec![0u8; 128];
+    v.extend_from_slice(b"DICM");
+    v.extend_from_slice(&[0x11u8; 16]);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, v).unwrap();
+}
+
 /// Write a minimal DICOM file from hand-built bytes.
 ///
 /// Needed for inputs the writer itself refuses to produce: text encoded as UTF-8
