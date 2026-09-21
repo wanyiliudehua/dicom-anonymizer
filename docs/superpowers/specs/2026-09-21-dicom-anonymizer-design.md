@@ -135,6 +135,11 @@ shift_salt = ""                        # empty => random per run
 [uids]
 strategy = "remap"                     # remap | zero
 root = "2.25."                         # valid UID root for generated UIDs
+salt = ""                             # empty => random per run (see §9)
+
+[dummies]
+# optional overrides for the D action; unspecified tags use built-in defaults
+# "0008,0070" = "ANON"
 
 [pixels]
 mode = "mask"                          # mask | keep
@@ -157,6 +162,10 @@ frames = "all"                         # all | [0, 1, 2]
 ```
 
 **Merge precedence:** user config > selected preset > built-in defaults.
+
+**Precedence notes:** `profile.retain_longitudinal_temporal = true` sets the default date
+strategy to `shift`; an explicit `[dates] strategy` overrides it. Empty `dates.shift_salt`
+and empty `uids.salt` each independently mean "random per run".
 
 **Presets:**
 - `ps3.15-basic`: PS3.15 Basic Application Level Confidentiality Profile, no options.
@@ -222,8 +231,13 @@ read BurnedInAnnotation (0028,0301)
   -> adjust dependent attributes for the transcode
 ```
 
-- `on_missing_burnedin` controls behavior when `(0028,0301)` is absent:
-  `warn` (default), `skip`, or `mask_all`.
+- Configured `[[pixels.regions]]` are matched and applied **regardless** of the
+  `BurnedInAnnotation` value; that tag is informational input, not a gate.
+- `on_missing_burnedin` only controls behavior when `(0028,0301)` is **absent**:
+  `warn` (default) logs a warning and still applies configured regions; `skip` skips
+  pixel processing for that file; `mask_all` fills the entire frame(s).
+- Output transfer syntax is Explicit VR LE **only** when pixel data was decoded and
+  rewritten. With `pixels.mode = "keep"`, the original transfer syntax is preserved.
 - Multi-frame (`NumberOfFrames`) and `PlanarConfiguration` are handled.
 - JPEG-LS requires the optional `charls` feature. If it is not compiled in and a JPEG-LS
   file is encountered, the file is recorded as `unsupported` and the batch continues.
