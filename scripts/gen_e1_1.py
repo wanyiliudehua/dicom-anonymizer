@@ -121,7 +121,10 @@ def main() -> int:
         "",
         "use crate::config::Action;",
         "",
-        "pub const E11: &[(&str, Action, &[(&str, Action)])] = &[",
+        "/// One E.1-1 attribute: `(tag, basic_action, option_actions)`.",
+        "pub type E11Row = (&'static str, Action, &'static [(&'static str, Action)]);",
+        "",
+        "pub const E11: &[E11Row] = &[",
     ]
     for g, e in order:
         name, act, opts = seen[(g, e)]

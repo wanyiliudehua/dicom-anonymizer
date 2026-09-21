@@ -59,7 +59,10 @@ mod tests {
     fn set_get_remove_zero_roundtrip() {
         let mut o = InMemDicomObject::new_empty();
         set_string(&mut o, tag(0x0010, 0x0010), VR::PN, "Doe^John");
-        assert_eq!(get_string(&o, tag(0x0010, 0x0010)).as_deref(), Some("Doe^John"));
+        assert_eq!(
+            get_string(&o, tag(0x0010, 0x0010)).as_deref(),
+            Some("Doe^John")
+        );
         assert!(remove(&mut o, tag(0x0010, 0x0010)));
         assert!(!remove(&mut o, tag(0x0010, 0x0010)));
         assert_eq!(get_string(&o, tag(0x0010, 0x0010)), None);
@@ -70,7 +73,10 @@ mod tests {
         let mut o = InMemDicomObject::new_empty();
         set_string(&mut o, tag(0x0010, 0x0010), VR::PN, "Doe^John");
         assert!(zero(&mut o, tag(0x0010, 0x0010)));
-        assert_ne!(get_string(&o, tag(0x0010, 0x0010)).as_deref(), Some("Doe^John"));
+        assert_ne!(
+            get_string(&o, tag(0x0010, 0x0010)).as_deref(),
+            Some("Doe^John")
+        );
     }
 
     #[test]

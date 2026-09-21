@@ -36,17 +36,19 @@ pub enum PixelMode {
     Keep,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OnMissing {
+    #[default]
     Warn,
     Skip,
     MaskAll,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Shape {
+    #[default]
     Rect,
     Polygon,
 }
@@ -58,17 +60,12 @@ pub enum Shape {
 /// * `conservative` — clear the direct identifiers (name, ID, birth date,
 ///   accession number, institution, device serial, ...) but retain patient
 ///   demographics (sex, age, size, weight) and all dates/times.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Strategy {
     Conservative,
+    #[default]
     Aggressive,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Strategy::Aggressive
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -99,16 +96,11 @@ pub enum FillValue {
     Named(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Frames {
+    #[default]
     All,
     List(Vec<u32>),
-}
-
-impl Default for Frames {
-    fn default() -> Self {
-        Frames::All
-    }
 }
 
 impl<'de> Deserialize<'de> for Frames {
@@ -290,18 +282,6 @@ impl Default for FillValue {
     }
 }
 
-impl Default for OnMissing {
-    fn default() -> Self {
-        OnMissing::Warn
-    }
-}
-
-impl Default for Shape {
-    fn default() -> Self {
-        Shape::Rect
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
@@ -379,8 +359,7 @@ pub fn is_valid_uid_root(root: &str) -> bool {
 
 impl Config {
     pub fn from_toml_str(s: &str) -> Result<Config> {
-        let user: toml::Value =
-            toml::from_str(s).map_err(|e| AnonError::Config(e.to_string()))?;
+        let user: toml::Value = toml::from_str(s).map_err(|e| AnonError::Config(e.to_string()))?;
         let base = user
             .get("profile")
             .and_then(|p| p.get("base"))
@@ -458,10 +437,9 @@ mod tests {
 
     #[test]
     fn user_value_overrides_preset() {
-        let c = Config::from_toml_str(
-            "[profile]\nbase = \"research\"\nretain_safe_private = false\n",
-        )
-        .unwrap();
+        let c =
+            Config::from_toml_str("[profile]\nbase = \"research\"\nretain_safe_private = false\n")
+                .unwrap();
         assert!(c.profile.retain_longitudinal_temporal);
         assert!(!c.profile.retain_safe_private);
     }

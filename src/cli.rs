@@ -39,8 +39,8 @@ mod tests {
 
     #[test]
     fn parses_required_args() {
-        let a = Args::try_parse_from(["dicom-anonymizer", "--input", "in", "--output", "out"])
-            .unwrap();
+        let a =
+            Args::try_parse_from(["dicom-anonymizer", "--input", "in", "--output", "out"]).unwrap();
         assert_eq!(a.input.to_string_lossy(), "in");
         assert_eq!(a.output.to_string_lossy(), "out");
         assert!(!a.dry_run);
@@ -54,10 +54,8 @@ mod tests {
 
     #[test]
     fn parses_strategy_flag() {
-        let a = Args::try_parse_from([
-            "x", "-i", "in", "-o", "out", "--strategy", "conservative",
-        ])
-        .unwrap();
+        let a = Args::try_parse_from(["x", "-i", "in", "-o", "out", "--strategy", "conservative"])
+            .unwrap();
         assert_eq!(a.strategy.as_deref(), Some("conservative"));
     }
 }

@@ -132,7 +132,9 @@ fn run() -> i32 {
     } else {
         use rayon::prelude::*;
         if let Some(n) = args.jobs {
-            let _ = rayon::ThreadPoolBuilder::new().num_threads(n).build_global();
+            let _ = rayon::ThreadPoolBuilder::new()
+                .num_threads(n)
+                .build_global();
         }
         // `Shared` is immutable, and UID/date mapping are pure functions, so
         // file processing parallelizes without any shared mutable state.

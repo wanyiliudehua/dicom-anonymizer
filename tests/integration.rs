@@ -33,8 +33,14 @@ fn end_to_end_mirrors_tree_and_deidentifies() {
 
     // the non-DICOM file is logged as skipped (spec §11)
     let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
-    assert!(audit.contains("\"status\":\"skipped\""), "missing skipped record");
-    assert!(audit.contains("notes.txt"), "skipped record should name the file");
+    assert!(
+        audit.contains("\"status\":\"skipped\""),
+        "missing skipped record"
+    );
+    assert!(
+        audit.contains("notes.txt"),
+        "skipped record should name the file"
+    );
 
     let o1 = dicom_object::open_file(out.path().join("a/one.dcm")).unwrap();
     let n1 = o1
@@ -114,7 +120,10 @@ fn default_output_names_use_new_sop_instance_uid() {
         .collect();
     assert_eq!(entries.len(), 1);
     let name = entries[0].file_name().to_string_lossy().to_string();
-    assert!(name.starts_with("2.25.") && name.ends_with(".dcm"), "unexpected name {name}");
+    assert!(
+        name.starts_with("2.25.") && name.ends_with(".dcm"),
+        "unexpected name {name}"
+    );
 
     let o = dicom_object::open_file(out.path().join("a").join(&name)).unwrap();
     let sop = o

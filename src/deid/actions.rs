@@ -49,10 +49,7 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
     let mut changed = 0usize;
 
     for tag in ds::tag_list(obj) {
-        let is_seq = obj
-            .element(tag)
-            .map(|e| e.vr() == VR::SQ)
-            .unwrap_or(false);
+        let is_seq = obj.element(tag).map(|e| e.vr() == VR::SQ).unwrap_or(false);
 
         // Private (odd-group) tags are removed by default; retained only when
         // the safe-private option is on.
@@ -198,7 +195,11 @@ mod tests {
     use dicom_object::InMemDicomObject;
 
     fn ctx<'a>(cfg: &'a Config, u: &'a UidMapper, d: &'a DateShifter) -> DeidContext<'a> {
-        DeidContext { cfg, uids: u, dates: d }
+        DeidContext {
+            cfg,
+            uids: u,
+            dates: d,
+        }
     }
 
     #[test]
@@ -313,7 +314,8 @@ mod tests {
     }
 
     #[test]
-    fn private_tags_removed_by_default_and_kept_with_option() {        let mk = |retain: bool| {
+    fn private_tags_removed_by_default_and_kept_with_option() {
+        let mk = |retain: bool| {
             Config::from_toml_str(&format!(
                 "[dates]\nstrategy = \"zero\"\n[profile]\nretain_safe_private = {retain}\n"
             ))

@@ -154,9 +154,8 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
     let mut regions_masked = 0usize;
     if mask_all {
         for frame in 0..geo.frames {
-            samples_masked += mask_rect_in_place(
-                &mut pixels, &geo, frame, 0, 0, geo.columns, geo.rows, fill,
-            )?;
+            samples_masked +=
+                mask_rect_in_place(&mut pixels, &geo, frame, 0, 0, geo.columns, geo.rows, fill)?;
         }
         regions_masked = 1;
     } else {
@@ -177,9 +176,8 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
                         )?;
                     }
                     Shape::Polygon => {
-                        samples_masked += mask_polygon_in_place(
-                            &mut pixels, &geo, frame, &region.points, fill,
-                        )?;
+                        samples_masked +=
+                            mask_polygon_in_place(&mut pixels, &geo, frame, &region.points, fill)?;
                     }
                 }
             }
@@ -191,8 +189,10 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
 
     let elem = if geo.bits_allocated > 8 {
         let words: Vec<u16> = pixels
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         DataElement::new(tags::PIXEL_DATA, VR::OW, PrimitiveValue::U16(words.into()))
     } else {
@@ -244,7 +244,11 @@ mod tests {
             DataElement::new(tags::SOP_CLASS_UID, VR::UI, "1.2.840.10008.5.1.4.1.1.7"),
             DataElement::new(tags::SOP_INSTANCE_UID, VR::UI, "1.2.3.4"),
             DataElement::new(tags::ROWS, VR::US, PrimitiveValue::U16(vec![2u16].into())),
-            DataElement::new(tags::COLUMNS, VR::US, PrimitiveValue::U16(vec![2u16].into())),
+            DataElement::new(
+                tags::COLUMNS,
+                VR::US,
+                PrimitiveValue::U16(vec![2u16].into()),
+            ),
             DataElement::new(
                 tags::BITS_ALLOCATED,
                 VR::US,

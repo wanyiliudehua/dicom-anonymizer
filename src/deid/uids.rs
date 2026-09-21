@@ -70,7 +70,10 @@ mod tests {
         let m = UidMapper::new("2.25.", b"salt");
         let mut seen = std::collections::HashSet::new();
         for i in 0..1000u32 {
-            assert!(seen.insert(m.map(&format!("1.2.3.{i}"))), "collision at {i}");
+            assert!(
+                seen.insert(m.map(&format!("1.2.3.{i}"))),
+                "collision at {i}"
+            );
         }
     }
 }

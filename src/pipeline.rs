@@ -3,8 +3,8 @@
 use crate::audit::{self, Record, Status};
 use crate::config::{Config, FilenameMode};
 use crate::deid::actions::{apply, DeidContext};
-use crate::deid::dates::DateShifter;
 use crate::deid::dataset as ds;
+use crate::deid::dates::DateShifter;
 use crate::deid::uids::UidMapper;
 use crate::discovery::Job;
 use crate::error::{AnonError, Result};
@@ -144,7 +144,12 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     };
 
-    let mut rec = Record::ok(input_str, rel_str(&out_rel), tags_changed, report.regions_masked);
+    let mut rec = Record::ok(
+        input_str,
+        rel_str(&out_rel),
+        tags_changed,
+        report.regions_masked,
+    );
     rec.samples_masked = report.samples_masked;
     rec.transfer_syntax_in = Some(ts_in);
     rec.transfer_syntax_out = Some(obj.meta().transfer_syntax().to_string());
@@ -231,7 +236,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath.clone(), rel: "p.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath.clone(),
+            rel: "p.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, crate::audit::Status::Ok);
@@ -259,7 +268,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: true,
         };
-        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "p.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, crate::audit::Status::Ok);
@@ -302,7 +315,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "sub/orig-name.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);
@@ -343,7 +360,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "p.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);
@@ -363,10 +384,8 @@ mod tests {
         let out = tempfile::tempdir().unwrap();
         let inpath = src.path().join("orig-name.dcm");
         make_dicom(&inpath);
-        let cfg = crate::config::Config::from_toml_str(
-            "[output]\nfilename = \"preserve\"\n",
-        )
-        .unwrap();
+        let cfg =
+            crate::config::Config::from_toml_str("[output]\nfilename = \"preserve\"\n").unwrap();
         let shared = Shared {
             cfg,
             uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
@@ -374,7 +393,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "sub/orig-name.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);
@@ -399,7 +422,11 @@ mod tests {
             DataElement::new(dicom_dictionary_std::tags::ROWS, VR::US, u16v(2)),
             DataElement::new(dicom_dictionary_std::tags::COLUMNS, VR::US, u16v(2)),
             DataElement::new(dicom_dictionary_std::tags::BITS_ALLOCATED, VR::US, u16v(8)),
-            DataElement::new(dicom_dictionary_std::tags::SAMPLES_PER_PIXEL, VR::US, u16v(1)),
+            DataElement::new(
+                dicom_dictionary_std::tags::SAMPLES_PER_PIXEL,
+                VR::US,
+                u16v(1),
+            ),
             DataElement::new(
                 dicom_dictionary_std::tags::PIXEL_DATA,
                 VR::OB,
@@ -430,7 +457,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "p.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Error);
@@ -462,7 +493,11 @@ mod tests {
                 VR::UI,
                 "1.2.840.10008.1.2.3",
             ),
-            DataElement::new(Tag(0x0008, 0x1115), VR::SQ, DataSetSequence::from(vec![inner])),
+            DataElement::new(
+                Tag(0x0008, 0x1115),
+                VR::SQ,
+                DataSetSequence::from(vec![inner]),
+            ),
         ]);
         obj.with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
             .unwrap()
@@ -476,7 +511,11 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let job = Job {
+            input: inpath,
+            rel: "p.dcm".into(),
+            dicom: true,
+        };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);

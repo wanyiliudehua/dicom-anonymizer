@@ -106,7 +106,14 @@ mod tests {
     fn jsonl_record_has_required_fields() {
         let r = Record::ok("in.dcm", "out.dcm", 3, 2);
         let s = serde_json::to_string(&r).unwrap();
-        for k in ["input", "output", "status", "tags_changed", "regions_masked", "samples_masked"] {
+        for k in [
+            "input",
+            "output",
+            "status",
+            "tags_changed",
+            "regions_masked",
+            "samples_masked",
+        ] {
             assert!(s.contains(k), "missing {k}");
         }
     }

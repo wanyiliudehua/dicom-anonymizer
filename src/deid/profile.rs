@@ -156,7 +156,10 @@ mod tests {
     fn user_tags_override_profile() {
         let cfg = Config::from_toml_str("[tags]\n\"0010,0010\" = \"K\"\n").unwrap();
         let m = rule_map(&cfg);
-        assert_eq!(m[&crate::config::parse_tag("0010,0010").unwrap()], Action::K);
+        assert_eq!(
+            m[&crate::config::parse_tag("0010,0010").unwrap()],
+            Action::K
+        );
     }
 
     #[test]
@@ -169,9 +172,18 @@ mod tests {
     #[test]
     fn covers_instance_uid_and_descriptions() {
         let m = rule_map(&Config::default());
-        assert_eq!(m[&crate::config::parse_tag("0008,0018").unwrap()], Action::U);
-        assert_eq!(m[&crate::config::parse_tag("0008,1030").unwrap()], Action::X);
-        assert_eq!(m[&crate::config::parse_tag("0008,103E").unwrap()], Action::X);
+        assert_eq!(
+            m[&crate::config::parse_tag("0008,0018").unwrap()],
+            Action::U
+        );
+        assert_eq!(
+            m[&crate::config::parse_tag("0008,1030").unwrap()],
+            Action::X
+        );
+        assert_eq!(
+            m[&crate::config::parse_tag("0008,103E").unwrap()],
+            Action::X
+        );
     }
 
     #[test]
@@ -239,7 +251,11 @@ mod tests {
             "0008,002A", // Acquisition DateTime
             "0008,0013", // Instance Creation Time
         ] {
-            assert_eq!(m[&parse_tag(t).unwrap()], Action::K, "{t} should be retained");
+            assert_eq!(
+                m[&parse_tag(t).unwrap()],
+                Action::K,
+                "{t} should be retained"
+            );
         }
         // direct identifiers still cleared
         assert_eq!(m[&parse_tag("0010,0010").unwrap()], Action::Z); // Name
@@ -265,12 +281,32 @@ mod tests {
         use crate::config::parse_tag;
         // (flag, tag, basic action, action with the option enabled)
         let cases = [
-            ("retain_institution_identity", "0008,0080", Action::Z, Action::K),
+            (
+                "retain_institution_identity",
+                "0008,0080",
+                Action::Z,
+                Action::K,
+            ),
             ("retain_uids", "0020,000D", Action::U, Action::K),
             ("retain_device_identity", "0018,1000", Action::Z, Action::K),
-            ("retain_patient_characteristics", "0010,0040", Action::Z, Action::K),
-            ("retain_longitudinal_full_dates", "0008,0020", Action::Z, Action::K),
-            ("retain_longitudinal_temporal", "0008,0020", Action::Z, Action::C),
+            (
+                "retain_patient_characteristics",
+                "0010,0040",
+                Action::Z,
+                Action::K,
+            ),
+            (
+                "retain_longitudinal_full_dates",
+                "0008,0020",
+                Action::Z,
+                Action::K,
+            ),
+            (
+                "retain_longitudinal_temporal",
+                "0008,0020",
+                Action::Z,
+                Action::C,
+            ),
             ("clean_descriptors", "0008,1030", Action::X, Action::C),
         ];
         for (flag, tag, basic, with_option) in cases {

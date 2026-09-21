@@ -41,11 +41,12 @@ fn write_sample(px: &mut [u8], offset: usize, bytes: usize, fill: u16) {
 fn bounds_ok(geo: &Geometry, x: u32, y: u32, w: u32, h: u32) -> bool {
     w > 0
         && h > 0
-        && x.checked_add(w).map_or(false, |r| r <= geo.columns)
-        && y.checked_add(h).map_or(false, |r| r <= geo.rows)
+        && x.checked_add(w).is_some_and(|r| r <= geo.columns)
+        && y.checked_add(h).is_some_and(|r| r <= geo.rows)
 }
 
 /// Fill an axis-aligned rectangle; returns the number of samples written.
+#[allow(clippy::too_many_arguments)]
 pub fn mask_rect_in_place(
     pixels: &mut [u8],
     geo: &Geometry,
@@ -137,7 +138,13 @@ mod tests {
     use super::*;
 
     fn geo8() -> Geometry {
-        Geometry { rows: 2, columns: 2, samples_per_pixel: 1, bits_allocated: 8, frames: 1 }
+        Geometry {
+            rows: 2,
+            columns: 2,
+            samples_per_pixel: 1,
+            bits_allocated: 8,
+            frames: 1,
+        }
     }
 
     #[test]
@@ -150,7 +157,13 @@ mod tests {
 
     #[test]
     fn mask_rect_sets_exact_samples_16bit() {
-        let geo = Geometry { rows: 1, columns: 2, samples_per_pixel: 1, bits_allocated: 16, frames: 1 };
+        let geo = Geometry {
+            rows: 1,
+            columns: 2,
+            samples_per_pixel: 1,
+            bits_allocated: 16,
+            frames: 1,
+        };
         let mut px = vec![0u8; 4];
         let n = mask_rect_in_place(&mut px, &geo, 0, 1, 0, 1, 1, 7).unwrap();
         assert_eq!(n, 1);
@@ -159,7 +172,13 @@ mod tests {
 
     #[test]
     fn mask_is_multichannel_aware() {
-        let geo = Geometry { rows: 1, columns: 1, samples_per_pixel: 3, bits_allocated: 8, frames: 1 };
+        let geo = Geometry {
+            rows: 1,
+            columns: 1,
+            samples_per_pixel: 3,
+            bits_allocated: 8,
+            frames: 1,
+        };
         let mut px = vec![0u8; 3];
         let n = mask_rect_in_place(&mut px, &geo, 0, 0, 0, 1, 1, 9).unwrap();
         assert_eq!(n, 3);
@@ -174,7 +193,13 @@ mod tests {
 
     #[test]
     fn frame_selection_offsets_correctly() {
-        let geo = Geometry { rows: 1, columns: 1, samples_per_pixel: 1, bits_allocated: 8, frames: 2 };
+        let geo = Geometry {
+            rows: 1,
+            columns: 1,
+            samples_per_pixel: 1,
+            bits_allocated: 8,
+            frames: 2,
+        };
         let mut px = vec![0u8; 2];
         mask_rect_in_place(&mut px, &geo, 1, 0, 0, 1, 1, 5).unwrap();
         assert_eq!(px, vec![0, 5]);
@@ -182,7 +207,13 @@ mod tests {
 
     #[test]
     fn polygon_masks_a_triangle() {
-        let geo = Geometry { rows: 3, columns: 3, samples_per_pixel: 1, bits_allocated: 8, frames: 1 };
+        let geo = Geometry {
+            rows: 3,
+            columns: 3,
+            samples_per_pixel: 1,
+            bits_allocated: 8,
+            frames: 1,
+        };
         let mut px = vec![0u8; 9];
         let pts = [[0i64, 0], [3, 0], [0, 3]];
         let n = mask_polygon_in_place(&mut px, &geo, 0, &pts, 1).unwrap();

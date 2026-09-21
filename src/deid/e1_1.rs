@@ -10,73 +10,189 @@
 
 use crate::config::Action;
 
-pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
+/// One E.1-1 attribute: `(tag, basic_action, option_actions)`.
+pub type E11Row = (&'static str, Action, &'static [(&'static str, Action)]);
+
+pub const E11: &[E11Row] = &[
     ("0008,0050", Action::Z, &[]), // Accession Number
     ("0018,4000", Action::X, &[("clean_desc", Action::C)]), // Acquisition Comments
     ("0040,0556", Action::X, &[("clean_desc", Action::C)]), // Acquisition Context Description
     ("0040,0555", Action::Z, &[("clean_struct", Action::C)]), // Acquisition Context Sequence
-    ("0008,0022", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Acquisition Date
-    ("0008,002A", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Acquisition DateTime
+    (
+        "0008,0022",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Acquisition Date
+    (
+        "0008,002A",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Acquisition DateTime
     ("0018,1400", Action::D, &[("clean_desc", Action::C)]), // Acquisition Device Processing Description
     ("0018,11BB", Action::D, &[("clean_desc", Action::C)]), // Acquisition Field of View Label
     ("0018,9424", Action::X, &[("clean_desc", Action::C)]), // Acquisition Protocol Description
-    ("0008,0032", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Acquisition Time
-    ("0008,0017", Action::U, &[("rtn_uids", Action::K)]), // Acquisition UID
-    ("0040,4035", Action::X, &[]), // Actual Human Performers Sequence
+    (
+        "0008,0032",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Acquisition Time
+    ("0008,0017", Action::U, &[("rtn_uids", Action::K)]),   // Acquisition UID
+    ("0040,4035", Action::X, &[]),                          // Actual Human Performers Sequence
     ("0010,21B0", Action::X, &[("clean_desc", Action::C)]), // Additional Patient History
-    ("0040,A353", Action::X, &[]), // Address (Trial)
-    ("0038,0010", Action::X, &[]), // Admission ID
-    ("0038,0020", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Admitting Date
+    ("0040,A353", Action::X, &[]),                          // Address (Trial)
+    ("0038,0010", Action::X, &[]),                          // Admission ID
+    (
+        "0038,0020",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Admitting Date
     ("0008,1084", Action::X, &[("clean_desc", Action::C)]), // Admitting Diagnoses Code Sequence
     ("0008,1080", Action::X, &[("clean_desc", Action::C)]), // Admitting Diagnoses Description
-    ("0038,0021", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Admitting Time
-    ("0000,1000", Action::X, &[("rtn_uids", Action::K)]), // Affected SOP Instance UID
-    ("0010,2110", Action::X, &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)]), // Allergies
-    ("0040,B034", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Annotation DateTime
+    (
+        "0038,0021",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Admitting Time
+    ("0000,1000", Action::X, &[("rtn_uids", Action::K)]),   // Affected SOP Instance UID
+    (
+        "0010,2110",
+        Action::X,
+        &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)],
+    ), // Allergies
+    (
+        "0040,B034",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Annotation DateTime
     ("006A,0006", Action::X, &[("clean_desc", Action::C)]), // Annotation Group Description
     ("006A,0005", Action::D, &[("clean_desc", Action::C)]), // Annotation Group Label
-    ("006A,0003", Action::D, &[("rtn_uids", Action::K)]), // Annotation Group UID
-    ("0044,0004", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Approval Status DateTime
-    ("4000,0010", Action::X, &[]), // Arbitrary
-    ("0044,0104", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Assertion DateTime
-    ("0044,0105", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Assertion Expiration DateTime
-    ("0400,0562", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Attribute Modification DateTime
-    ("0040,A078", Action::X, &[]), // Author Observer Sequence
-    ("2200,0005", Action::Z, &[]), // Barcode Value
+    ("006A,0003", Action::D, &[("rtn_uids", Action::K)]),   // Annotation Group UID
+    (
+        "0044,0004",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Approval Status DateTime
+    ("4000,0010", Action::X, &[]),                          // Arbitrary
+    (
+        "0044,0104",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Assertion DateTime
+    (
+        "0044,0105",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Assertion Expiration DateTime
+    (
+        "0400,0562",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Attribute Modification DateTime
+    ("0040,A078", Action::X, &[]),                          // Author Observer Sequence
+    ("2200,0005", Action::Z, &[]),                          // Barcode Value
     ("300A,00C3", Action::X, &[("clean_desc", Action::C)]), // Beam Description
-    ("300C,0127", Action::D, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Beam Hold Transition DateTime
+    (
+        "300C,0127",
+        Action::D,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Beam Hold Transition DateTime
     ("300A,00DD", Action::X, &[("clean_desc", Action::C)]), // Bolus Description
-    ("0010,1081", Action::X, &[]), // Branch of Service
-    ("0014,407E", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Calibration Date
-    ("0018,1203", Action::Z, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Calibration DateTime
-    ("0014,407C", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Calibration Time
-    ("0016,004D", Action::X, &[]), // Camera Owner Name
+    ("0010,1081", Action::X, &[]),                          // Branch of Service
+    (
+        "0014,407E",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Calibration Date
+    (
+        "0018,1203",
+        Action::Z,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Calibration DateTime
+    (
+        "0014,407C",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Calibration Time
+    ("0016,004D", Action::X, &[]),                          // Camera Owner Name
     ("0018,1007", Action::X, &[("rtn_dev_id", Action::K)]), // Cassette ID
-    ("0400,0115", Action::D, &[]), // Certificate of Signer
-    ("0400,0310", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Certified Timestamp
+    ("0400,0115", Action::D, &[]),                          // Certificate of Signer
+    (
+        "0400,0310",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Certified Timestamp
     ("003A,020C", Action::X, &[("clean_desc", Action::C)]), // Channel Derivation Description
     ("003A,0203", Action::X, &[("clean_desc", Action::C)]), // Channel Label
     ("0012,0060", Action::Z, &[("rtn_inst_id", Action::K)]), // Clinical Trial Coordinating Center Name
     ("0012,0082", Action::X, &[]), // Clinical Trial Protocol Ethics Committee Approval Number
     ("0012,0081", Action::D, &[("rtn_inst_id", Action::K)]), // Clinical Trial Protocol Ethics Committee Name
-    ("0012,0020", Action::D, &[]), // Clinical Trial Protocol ID
-    ("0012,0021", Action::Z, &[]), // Clinical Trial Protocol Name
-    ("0012,0072", Action::X, &[("clean_desc", Action::C)]), // Clinical Trial Series Description
-    ("0012,0071", Action::X, &[]), // Clinical Trial Series ID
+    ("0012,0020", Action::D, &[]),                           // Clinical Trial Protocol ID
+    ("0012,0021", Action::Z, &[]),                           // Clinical Trial Protocol Name
+    ("0012,0072", Action::X, &[("clean_desc", Action::C)]),  // Clinical Trial Series Description
+    ("0012,0071", Action::X, &[]),                           // Clinical Trial Series ID
     ("0012,0030", Action::Z, &[("rtn_inst_id", Action::K)]), // Clinical Trial Site ID
     ("0012,0031", Action::Z, &[("rtn_inst_id", Action::K)]), // Clinical Trial Site Name
-    ("0012,0010", Action::D, &[]), // Clinical Trial Sponsor Name
-    ("0012,0040", Action::D, &[]), // Clinical Trial Subject ID
-    ("0012,0042", Action::D, &[]), // Clinical Trial Subject Reading ID
+    ("0012,0010", Action::D, &[]),                           // Clinical Trial Sponsor Name
+    ("0012,0040", Action::D, &[]),                           // Clinical Trial Subject ID
+    ("0012,0042", Action::D, &[]),                           // Clinical Trial Subject Reading ID
     ("0012,0051", Action::X, &[("clean_desc", Action::C)]), // Clinical Trial Time Point Description
-    ("0012,0050", Action::Z, &[]), // Clinical Trial Time Point ID
+    ("0012,0050", Action::Z, &[]),                          // Clinical Trial Time Point ID
     ("0040,0310", Action::X, &[("clean_desc", Action::C)]), // Comments on Radiation Dose
     ("0040,0280", Action::X, &[("clean_desc", Action::C)]), // Comments on the Performed Procedure Step
     ("300A,02EB", Action::X, &[("clean_desc", Action::C)]), // Compensator Description
-    ("0020,9161", Action::U, &[("rtn_uids", Action::K)]), // Concatenation UID
+    ("0020,9161", Action::U, &[("rtn_uids", Action::K)]),   // Concatenation UID
     ("3010,000F", Action::Z, &[("clean_desc", Action::C)]), // Conceptual Volume Combination Description
     ("3010,0017", Action::Z, &[("clean_desc", Action::C)]), // Conceptual Volume Description
-    ("3010,0006", Action::U, &[("rtn_uids", Action::K)]), // Conceptual Volume UID
+    ("3010,0006", Action::U, &[("rtn_uids", Action::K)]),   // Conceptual Volume UID
     ("0040,3001", Action::X, &[]), // Confidentiality Constraint on Patient Data Description
     ("3010,0013", Action::U, &[("rtn_uids", Action::K)]), // Constituent Conceptual Volume UID
     ("0008,009C", Action::Z, &[]), // Consulting Physician's Name
@@ -86,35 +202,187 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0040,0512", Action::D, &[]), // Container Identifier
     ("0070,0086", Action::X, &[]), // Content Creator's Identification Code Sequence
     ("0070,0084", Action::Z, &[]), // Content Creator's Name
-    ("0008,0023", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Content Date
+    (
+        "0008,0023",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Content Date
     ("0040,A730", Action::D, &[("clean_struct", Action::C)]), // Content Sequence
-    ("0008,0033", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Content Time
-    ("0008,0107", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Context Group Local Version
-    ("0008,0106", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Context Group Version
+    (
+        "0008,0033",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Content Time
+    (
+        "0008,0107",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Context Group Local Version
+    (
+        "0008,0106",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Context Group Version
     ("0018,0010", Action::Z, &[("clean_desc", Action::C)]), // Contrast/Bolus Agent
-    ("0018,1042", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Contrast/Bolus Start Time
-    ("0018,1043", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Contrast/Bolus Stop Time
-    ("0018,A002", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Contribution DateTime
+    (
+        "0018,1042",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Contrast/Bolus Start Time
+    (
+        "0018,1043",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Contrast/Bolus Stop Time
+    (
+        "0018,A002",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Contribution DateTime
     ("0018,A003", Action::X, &[("clean_desc", Action::C)]), // Contribution Description
     ("0010,2150", Action::X, &[]), // Country of Residence
-    ("2100,0040", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Creation Date
-    ("2100,0050", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Creation Time
+    (
+        "2100,0040",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Creation Date
+    (
+        "2100,0050",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Creation Time
     ("0040,A307", Action::X, &[]), // Current Observer (Trial)
     ("0038,0300", Action::X, &[]), // Current Patient Location
-    ("0008,0025", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Curve Date
-    ("0008,0035", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Curve Time
+    (
+        "0008,0025",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Curve Date
+    (
+        "0008,0035",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Curve Time
     ("0040,A07C", Action::X, &[]), // Custodial Organization Sequence
     ("FFFC,FFFC", Action::X, &[]), // Data Set Trailing Padding
-    ("0040,A121", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date
-    ("0040,A110", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Document or Verbal Transaction (Trial)
-    ("0018,1205", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Installation
-    ("0018,1200", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Last Calibration
-    ("0018,700C", Action::D, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Last Detector Calibration
-    ("0018,1204", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Manufacture
-    ("0018,1012", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Date of Secondary Capture
-    ("0040,A120", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // DateTime
-    ("0018,1202", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // DateTime of Last Calibration
-    ("0018,9701", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Decay Correction DateTime
+    (
+        "0040,A121",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date
+    (
+        "0040,A110",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Document or Verbal Transaction (Trial)
+    (
+        "0018,1205",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Installation
+    (
+        "0018,1200",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Last Calibration
+    (
+        "0018,700C",
+        Action::D,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Last Detector Calibration
+    (
+        "0018,1204",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Manufacture
+    (
+        "0018,1012",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Date of Secondary Capture
+    (
+        "0040,A120",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // DateTime
+    (
+        "0018,1202",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // DateTime of Last Calibration
+    (
+        "0018,9701",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Decay Correction DateTime
     ("0018,937F", Action::X, &[("clean_desc", Action::C)]), // Decomposition Description
     ("0008,2111", Action::X, &[("clean_desc", Action::C)]), // Derivation Description
     ("2100,0140", Action::D, &[("rtn_dev_id", Action::C)]), // Destination AE
@@ -124,14 +392,39 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("3010,002D", Action::D, &[("rtn_dev_id", Action::K)]), // Device Label
     ("0018,1000", Action::Z, &[("rtn_dev_id", Action::K)]), // Device Serial Number
     ("0016,004B", Action::X, &[("clean_desc", Action::C)]), // Device Setting Description
-    ("0018,1002", Action::U, &[("rtn_uids", Action::K), ("rtn_dev_id", Action::K)]), // Device UID
-    ("0400,0105", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Digital Signature DateTime
+    (
+        "0018,1002",
+        Action::U,
+        &[("rtn_uids", Action::K), ("rtn_dev_id", Action::K)],
+    ), // Device UID
+    (
+        "0400,0105",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Digital Signature DateTime
     ("FFFA,FFFA", Action::X, &[]), // Digital Signatures Sequence
     ("0400,0100", Action::U, &[]), // Digital Signature UID
     ("0020,9164", Action::U, &[("rtn_uids", Action::K)]), // Dimension Organization UID
-    ("0038,0030", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Discharge Date
+    (
+        "0038,0030",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Discharge Date
     ("0038,0040", Action::X, &[("clean_desc", Action::C)]), // Discharge Diagnosis Description
-    ("0038,0032", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Discharge Time
+    (
+        "0038,0032",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Discharge Time
     ("300A,079A", Action::X, &[("clean_desc", Action::C)]), // Displacement Reference Label
     ("0040,E012", Action::X, &[]), // Display URI
     ("4008,011A", Action::X, &[]), // Distribution Address
@@ -140,41 +433,146 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("300A,0016", Action::X, &[("clean_desc", Action::C)]), // Dose Reference Description
     ("300A,0013", Action::U, &[("rtn_uids", Action::K)]), // Dose Reference UID
     ("3010,006E", Action::U, &[("rtn_uids", Action::K)]), // Dosimetric Objective UID
-    ("0068,6226", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Effective DateTime
-    ("0040,A034", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Effective Start DateTime
-    ("0040,A035", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Effective Stop DateTime
+    (
+        "0068,6226",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Effective DateTime
+    (
+        "0040,A034",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Effective Start DateTime
+    (
+        "0040,A035",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Effective Stop DateTime
     ("0042,0011", Action::D, &[]), // Encapsulated Document
-    ("0018,9517", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // End Acquisition DateTime
+    (
+        "0018,9517",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // End Acquisition DateTime
     ("3010,0037", Action::X, &[("clean_desc", Action::C)]), // Entity Description
     ("3010,0035", Action::D, &[("clean_desc", Action::C)]), // Entity Label
     ("3010,0038", Action::D, &[("clean_desc", Action::C)]), // Entity Long Label
     ("3010,0036", Action::X, &[("clean_desc", Action::C)]), // Entity Name
     ("300A,0676", Action::X, &[("clean_desc", Action::C)]), // Equipment Frame of Reference Description
-    ("0012,0087", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Ethics Committee Approval Effectiveness End Date
-    ("0012,0086", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Ethics Committee Approval Effectiveness Start Date
+    (
+        "0012,0087",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Ethics Committee Approval Effectiveness End Date
+    (
+        "0012,0086",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Ethics Committee Approval Effectiveness Start Date
     ("0010,2160", Action::X, &[("rtn_pat_chars", Action::K)]), // Ethnic Group
     ("0010,2161", Action::X, &[("rtn_pat_chars", Action::K)]), // Ethnic Group Code Sequence
     ("0010,2162", Action::X, &[("rtn_pat_chars", Action::K)]), // Ethnic Groups
-    ("0018,9804", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Exclusion Start DateTime
-    ("0040,4011", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Expected Completion DateTime
-    ("0008,0058", Action::U, &[("rtn_uids", Action::K)]), // Failed SOP Instance UID List
-    ("0070,031A", Action::U, &[("rtn_uids", Action::K)]), // Fiducial UID
+    (
+        "0018,9804",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Exclusion Start DateTime
+    (
+        "0040,4011",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Expected Completion DateTime
+    ("0008,0058", Action::U, &[("rtn_uids", Action::K)]),   // Failed SOP Instance UID List
+    ("0070,031A", Action::U, &[("rtn_uids", Action::K)]),   // Fiducial UID
     ("0040,2017", Action::Z, &[]), // Filler Order Number / Imaging Service Request
     ("003A,032B", Action::X, &[("clean_desc", Action::C)]), // Filter Lookup Table Description
-    ("0040,A023", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Findings Group Recording Date (Trial)
-    ("0040,A024", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Findings Group Recording Time (Trial)
-    ("3008,0054", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // First Treatment Date
+    (
+        "0040,A023",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Findings Group Recording Date (Trial)
+    (
+        "0040,A024",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Findings Group Recording Time (Trial)
+    (
+        "3008,0054",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // First Treatment Date
     ("300A,0196", Action::X, &[("clean_desc", Action::C)]), // Fixation Device Description
     ("0034,0002", Action::D, &[]), // Flow Identifier
     ("0034,0001", Action::D, &[]), // Flow Identifier Sequence
     ("3010,007F", Action::Z, &[("clean_desc", Action::C)]), // Fractionation Notes
     ("300A,0072", Action::X, &[("clean_desc", Action::C)]), // Fraction Group Description
-    ("0018,9074", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Frame Acquisition DateTime
+    (
+        "0018,9074",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Frame Acquisition DateTime
     ("0020,9158", Action::X, &[("clean_desc", Action::C)]), // Frame Comments
     ("0020,0052", Action::U, &[("rtn_uids", Action::K)]), // Frame of Reference UID
-    ("0034,0007", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Frame Origin Timestamp
-    ("0018,9151", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Frame Reference DateTime
-    ("0018,9623", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Functional Sync Pulse
+    (
+        "0034,0007",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Frame Origin Timestamp
+    (
+        "0018,9151",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Frame Reference DateTime
+    (
+        "0018,9623",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Functional Sync Pulse
     ("0018,1008", Action::X, &[("rtn_dev_id", Action::K)]), // Gantry ID
     ("0010,0044", Action::X, &[]), // Gender Identity Code Sequence
     ("0010,0045", Action::X, &[("clean_desc", Action::C)]), // Gender Identity Comment
@@ -183,7 +581,14 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0016,0076", Action::X, &[]), // GPS Altitude
     ("0016,0075", Action::X, &[]), // GPS Altitude Ref
     ("0016,008C", Action::X, &[]), // GPS Area Information
-    ("0016,008D", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // GPS Date Stamp
+    (
+        "0016,008D",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // GPS Date Stamp
     ("0016,0088", Action::X, &[]), // GPS Dest Bearing
     ("0016,0087", Action::X, &[]), // GPS Dest Bearing Ref
     ("0016,008A", Action::X, &[]), // GPS Dest Distance
@@ -212,10 +617,24 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0016,007E", Action::X, &[]), // GPS Track Ref
     ("0016,0070", Action::X, &[]), // GPS Version ID
     ("0070,0001", Action::D, &[("clean_graph", Action::C)]), // Graphic Annotation Sequence
-    ("0072,000A", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Hanging Protocol Creation DateTime
+    (
+        "0072,000A",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Hanging Protocol Creation DateTime
     ("0018,1011", Action::X, &[("rtn_dev_id", Action::K)]), // Hardcopy Creation Device ID
     ("0008,1304", Action::X, &[("clean_desc", Action::C)]), // Histological Diagnoses Code Sequence
-    ("0040,E004", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // HL7 Document Effective Time
+    (
+        "0040,E004",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // HL7 Document Effective Time
     ("0040,4037", Action::X, &[]), // Human Performer's Name
     ("0040,4036", Action::X, &[]), // Human Performer's Organization
     ("0088,0200", Action::X, &[]), // Icon Image Sequence (see Note 11)
@@ -223,12 +642,47 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0020,4000", Action::X, &[("clean_desc", Action::C)]), // Image Comments
     ("0028,4000", Action::X, &[]), // Image Presentation Comments
     ("0040,2400", Action::X, &[("clean_desc", Action::C)]), // Imaging Service Request Comments
-    ("003A,0314", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Impedance Measurement DateTime
+    (
+        "003A,0314",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Impedance Measurement DateTime
     ("4008,0300", Action::X, &[("clean_desc", Action::C)]), // Impressions
-    ("0068,6270", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Information Issue DateTime
-    ("0008,0015", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Instance Coercion DateTime
-    ("0008,0012", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Instance Creation Date
-    ("0008,0013", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Instance Creation Time
+    (
+        "0068,6270",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Information Issue DateTime
+    (
+        "0008,0015",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Instance Coercion DateTime
+    (
+        "0008,0012",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Instance Creation Date
+    (
+        "0008,0013",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Instance Creation Time
     ("0008,0014", Action::U, &[("rtn_uids", Action::K)]), // Instance Creator UID
     ("0400,0600", Action::X, &[]), // Instance Origin Status
     ("0008,0081", Action::X, &[("rtn_inst_id", Action::K)]), // Institution Address
@@ -236,33 +690,131 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0008,1041", Action::X, &[("rtn_inst_id", Action::K)]), // Institutional Department Type Code Sequence
     ("0008,0082", Action::Z, &[("rtn_inst_id", Action::K)]), // Institution Code Sequence
     ("0008,0080", Action::Z, &[("rtn_inst_id", Action::K)]), // Institution Name
-    ("0018,9919", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Instruction Performed DateTime
-    ("0010,1050", Action::X, &[]), // Insurance Plan Identification
-    ("3010,0085", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Intended Fraction Start Time
-    ("3010,004D", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Intended Phase End Date
-    ("3010,004C", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Intended Phase Start Date
+    (
+        "0018,9919",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Instruction Performed DateTime
+    ("0010,1050", Action::X, &[]),                           // Insurance Plan Identification
+    (
+        "3010,0085",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Intended Fraction Start Time
+    (
+        "3010,004D",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Intended Phase End Date
+    (
+        "3010,004C",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Intended Phase Start Date
     ("0040,1011", Action::X, &[]), // Intended Recipients of Results Identification Sequence
-    ("300A,0741", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interlock DateTime
+    (
+        "300A,0741",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interlock DateTime
     ("300A,0742", Action::D, &[("clean_desc", Action::C)]), // Interlock Description
     ("300A,0783", Action::D, &[("clean_desc", Action::C)]), // Interlock Origin Description
-    ("4008,0112", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Approval Date
-    ("4008,0113", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Approval Time
+    (
+        "4008,0112",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Approval Date
+    (
+        "4008,0113",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Approval Time
     ("4008,0111", Action::X, &[]), // Interpretation Approver Sequence
     ("4008,010C", Action::X, &[]), // Interpretation Author
     ("4008,0115", Action::X, &[("clean_desc", Action::C)]), // Interpretation Diagnosis Description
     ("4008,0200", Action::X, &[]), // Interpretation ID
     ("4008,0202", Action::X, &[]), // Interpretation ID Issuer
-    ("4008,0100", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Recorded Date
-    ("4008,0101", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Recorded Time
+    (
+        "4008,0100",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Recorded Date
+    (
+        "4008,0101",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Recorded Time
     ("4008,0102", Action::X, &[]), // Interpretation Recorder
     ("4008,010B", Action::X, &[("clean_desc", Action::C)]), // Interpretation Text
     ("4008,010A", Action::X, &[]), // Interpretation Transcriber
-    ("4008,0108", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Transcription Date
-    ("4008,0109", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Interpretation Transcription Time
-    ("0018,0035", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Intervention Drug Start Time
-    ("0018,0027", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Intervention Drug Stop Time
+    (
+        "4008,0108",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Transcription Date
+    (
+        "4008,0109",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Interpretation Transcription Time
+    (
+        "0018,0035",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Intervention Drug Start Time
+    (
+        "0018,0027",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Intervention Drug Stop Time
     ("0008,3010", Action::U, &[("rtn_uids", Action::K)]), // Irradiation Event UID
-    ("0040,2004", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Issue Date of Imaging Service Request
+    (
+        "0040,2004",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Issue Date of Imaging Service Request
     ("0038,0011", Action::X, &[]), // Issuer of Admission ID
     ("0038,0014", Action::X, &[]), // Issuer of Admission ID Sequence
     ("0012,0022", Action::X, &[]), // Issuer of Clinical Trial Protocol ID
@@ -276,10 +828,24 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0038,0064", Action::X, &[]), // Issuer of Service Episode ID Sequence
     ("0040,0513", Action::Z, &[]), // Issuer of the Container Identifier Sequence
     ("0040,0562", Action::Z, &[]), // Issuer of the Specimen Identifier Sequence
-    ("0040,2005", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Issue Time of Imaging Service Request
+    (
+        "0040,2005",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Issue Time of Imaging Service Request
     ("2200,0002", Action::Z, &[("clean_desc", Action::C)]), // Label Text
     ("0028,1214", Action::U, &[("rtn_uids", Action::K)]), // Large Palette Color Lookup Table UID
-    ("0010,21D0", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Last Menstrual Date
+    (
+        "0010,21D0",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Last Menstrual Date
     ("0016,004F", Action::X, &[("rtn_dev_id", Action::K)]), // Lens Make
     ("0016,0050", Action::X, &[("rtn_dev_id", Action::K)]), // Lens Model
     ("0016,0051", Action::X, &[("rtn_dev_id", Action::K)]), // Lens Serial Number
@@ -287,21 +853,46 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0050,0021", Action::X, &[("clean_desc", Action::C)]), // Long Device Description
     ("0400,0404", Action::X, &[]), // MAC
     ("0016,002B", Action::X, &[("clean_desc", Action::C)]), // Maker Note
-    ("0018,100B", Action::U, &[("rtn_uids", Action::K), ("rtn_dev_id", Action::K)]), // Manufacturer's Device Class UID
+    (
+        "0018,100B",
+        Action::U,
+        &[("rtn_uids", Action::K), ("rtn_dev_id", Action::K)],
+    ), // Manufacturer's Device Class UID
     ("3010,0043", Action::Z, &[("rtn_dev_id", Action::K)]), // Manufacturer's Device Identifier
     ("0002,0003", Action::U, &[("rtn_uids", Action::K)]), // Media Storage SOP Instance UID
     ("0010,2000", Action::X, &[("clean_desc", Action::C)]), // Medical Alerts
     ("0010,1090", Action::X, &[]), // Medical Record Locator
     ("0010,1080", Action::X, &[]), // Military Rank
     ("0400,0550", Action::X, &[]), // Modified Attributes Sequence
-    ("0020,3403", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Modified Image Date
+    (
+        "0020,3403",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Modified Image Date
     ("0020,3406", Action::X, &[]), // Modified Image Description
-    ("0020,3405", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Modified Image Time
+    (
+        "0020,3405",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Modified Image Time
     ("0020,3401", Action::X, &[("rtn_dev_id", Action::K)]), // Modifying Device ID
     ("0400,0563", Action::D, &[("rtn_dev_id", Action::K)]), // Modifying System
     ("0040,B03F", Action::X, &[("clean_desc", Action::C)]), // Montage Channel Label
     ("0040,B03B", Action::X, &[("clean_desc", Action::C)]), // Montage Name
-    ("3008,0056", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Most Recent Treatment Date
+    (
+        "3008,0056",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Most Recent Treatment Date
     ("0018,937B", Action::X, &[("clean_desc", Action::C)]), // Multi-energy Acquisition Description
     ("003A,0020", Action::X, &[("clean_desc", Action::C)]), // Multiplex Group Label
     ("003A,0310", Action::U, &[("rtn_uids", Action::K)]), // Multiplex Group UID
@@ -312,11 +903,39 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0008,1000", Action::X, &[("rtn_dev_id", Action::C)]), // Network ID
     ("0400,0552", Action::X, &[]), // Nonconforming Data Element Value
     ("0400,0551", Action::X, &[]), // Nonconforming Modified Attributes Sequence
-    ("0040,A192", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Observation Date (Trial)
-    ("0040,A032", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Observation DateTime
-    ("0040,A033", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Observation Start DateTime
+    (
+        "0040,A192",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Observation Date (Trial)
+    (
+        "0040,A032",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Observation DateTime
+    (
+        "0040,A033",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Observation Start DateTime
     ("0040,A402", Action::U, &[("rtn_uids", Action::K)]), // Observation Subject UID (Trial)
-    ("0040,A193", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Observation Time (Trial)
+    (
+        "0040,A193",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Observation Time (Trial)
     ("0040,A171", Action::U, &[("rtn_uids", Action::K)]), // Observation UID
     ("0010,2180", Action::X, &[("clean_desc", Action::C)]), // Occupation
     ("0008,1072", Action::D, &[]), // Operator Identification Sequence
@@ -331,12 +950,40 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0010,1000", Action::X, &[]), // Other Patient IDs
     ("0010,1002", Action::X, &[]), // Other Patient IDs Sequence
     ("0010,1001", Action::X, &[]), // Other Patient Names
-    ("0008,0024", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Overlay Date
-    ("0008,0034", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Overlay Time
-    ("300A,0760", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Override DateTime
+    (
+        "0008,0024",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Overlay Date
+    (
+        "0008,0034",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Overlay Time
+    (
+        "300A,0760",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Override DateTime
     ("0028,1199", Action::U, &[("rtn_uids", Action::K)]), // Palette Color Lookup Table UID
     ("0040,A07A", Action::X, &[]), // Participant Sequence
-    ("0040,A082", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Participation DateTime
+    (
+        "0040,A082",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Participation DateTime
     ("0010,1040", Action::X, &[]), // Patient's Address
     ("0010,1010", Action::X, &[("rtn_pat_chars", Action::K)]), // Patient's Age
     ("0010,0030", Action::Z, &[]), // Patient's Birth Date
@@ -359,24 +1006,70 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0010,0020", Action::Z, &[]), // Patient ID
     ("300A,0794", Action::X, &[("clean_desc", Action::C)]), // Patient Setup Photo Description
     ("300A,0650", Action::U, &[("rtn_uids", Action::K)]), // Patient Setup UID
-    ("0038,0500", Action::X, &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)]), // Patient State
+    (
+        "0038,0500",
+        Action::X,
+        &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)],
+    ), // Patient State
     ("0040,1004", Action::X, &[]), // Patient Transport Arrangements
     ("300A,0792", Action::X, &[("clean_desc", Action::C)]), // Patient Treatment Preparation Method Description
     ("300A,078E", Action::X, &[("clean_desc", Action::C)]), // Patient Treatment Preparation Procedure Parameter Description
-    ("0040,0243", Action::X, &[]), // Performed Location
+    ("0040,0243", Action::X, &[]),                          // Performed Location
     ("0040,0254", Action::X, &[("clean_desc", Action::C)]), // Performed Procedure Step Description
-    ("0040,0250", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step End Date
-    ("0040,4051", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step End DateTime
-    ("0040,0251", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step End Time
-    ("0040,0253", Action::X, &[]), // Performed Procedure Step ID
-    ("0040,0244", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step Start Date
-    ("0040,4050", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step Start DateTime
-    ("0040,0245", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Performed Procedure Step Start Time
+    (
+        "0040,0250",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step End Date
+    (
+        "0040,4051",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step End DateTime
+    (
+        "0040,0251",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step End Time
+    ("0040,0253", Action::X, &[]),                          // Performed Procedure Step ID
+    (
+        "0040,0244",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step Start Date
+    (
+        "0040,4050",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step Start DateTime
+    (
+        "0040,0245",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Performed Procedure Step Start Time
     ("0040,0241", Action::X, &[("rtn_dev_id", Action::C)]), // Performed Station AE Title
     ("0040,4030", Action::X, &[("rtn_dev_id", Action::K)]), // Performed Station Geographic Location Code Sequence
     ("0040,0242", Action::X, &[("rtn_dev_id", Action::K)]), // Performed Station Name
     ("0040,4028", Action::X, &[("rtn_dev_id", Action::K)]), // Performed Station Name Code Sequence
-    ("0008,1050", Action::X, &[]), // Performing Physician's Name
+    ("0008,1050", Action::X, &[]),                          // Performing Physician's Name
     ("0008,1052", Action::X, &[]), // Performing Physician Identification Sequence
     ("0040,1102", Action::X, &[]), // Person's Address
     ("0040,1104", Action::X, &[]), // Person's Telecom Information
@@ -397,29 +1090,85 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("300A,000E", Action::X, &[("clean_desc", Action::C)]), // Prescription Description
     ("3010,007B", Action::Z, &[("clean_desc", Action::C)]), // Prescription Notes
     ("3010,0081", Action::Z, &[("clean_desc", Action::C)]), // Prescription Notes Sequence
-    ("0070,0082", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Presentation Creation Date
-    ("0070,0083", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Presentation Creation Time
-    ("0070,1101", Action::U, &[("rtn_uids", Action::K)]), // Presentation Display Collection UID
-    ("0070,1102", Action::U, &[("rtn_uids", Action::K)]), // Presentation Sequence Collection UID
+    (
+        "0070,0082",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Presentation Creation Date
+    (
+        "0070,0083",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Presentation Creation Time
+    ("0070,1101", Action::U, &[("rtn_uids", Action::K)]),   // Presentation Display Collection UID
+    ("0070,1102", Action::U, &[("rtn_uids", Action::K)]),   // Presentation Sequence Collection UID
     ("0008,1302", Action::X, &[("clean_desc", Action::C)]), // Primary Diagnosis Code Sequence
     ("0008,1301", Action::X, &[("clean_desc", Action::C)]), // Principal Diagnosis Code Sequence
     ("3010,0061", Action::X, &[("clean_desc", Action::C)]), // Prior Treatment Dose Description
-    ("0040,4052", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Procedure Step Cancellation DateTime
-    ("0044,000B", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Product Expiration DateTime
-    ("0010,0015", Action::X, &[]), // Pronoun Code Sequence
+    (
+        "0040,4052",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Procedure Step Cancellation DateTime
+    (
+        "0044,000B",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Product Expiration DateTime
+    ("0010,0015", Action::X, &[]),                          // Pronoun Code Sequence
     ("0010,0016", Action::X, &[("clean_desc", Action::C)]), // Pronoun Comment
     ("0018,1030", Action::D, &[("clean_desc", Action::C)]), // Protocol Name
     ("0008,1088", Action::X, &[("clean_desc", Action::C)]), // Pyramid Description
     ("0020,0027", Action::X, &[("clean_desc", Action::C)]), // Pyramid Label
-    ("0008,0019", Action::U, &[("rtn_uids", Action::K)]), // Pyramid UID
+    ("0008,0019", Action::U, &[("rtn_uids", Action::K)]),   // Pyramid UID
     ("300A,0619", Action::D, &[("clean_desc", Action::C)]), // Radiation Dose Identification Label
     ("300A,0623", Action::D, &[("clean_desc", Action::C)]), // Radiation Dose In-Vivo Measurement Label
     ("300A,067D", Action::Z, &[("clean_desc", Action::C)]), // Radiation Generation Mode Description
     ("300A,067C", Action::D, &[("clean_desc", Action::C)]), // Radiation Generation Mode Label
-    ("0018,1078", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Radiopharmaceutical Start DateTime
-    ("0018,1072", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Radiopharmaceutical Start Time
-    ("0018,1079", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Radiopharmaceutical Stop DateTime
-    ("0018,1073", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Radiopharmaceutical Stop Time
+    (
+        "0018,1078",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Radiopharmaceutical Start DateTime
+    (
+        "0018,1072",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Radiopharmaceutical Start Time
+    (
+        "0018,1079",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Radiopharmaceutical Stop DateTime
+    (
+        "0018,1073",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Radiopharmaceutical Stop Time
     ("300C,0113", Action::X, &[("clean_desc", Action::C)]), // Reason for Omission Description
     ("0040,100A", Action::X, &[("clean_desc", Action::C)]), // Reason for Requested Procedure Code Sequence
     ("0032,1030", Action::X, &[("clean_desc", Action::C)]), // Reason for Study
@@ -430,29 +1179,43 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0032,1066", Action::X, &[("clean_desc", Action::C)]), // Reason for Visit
     ("0032,1067", Action::X, &[("clean_desc", Action::C)]), // Reason for Visit Code Sequence
     ("0074,1234", Action::X, &[("rtn_dev_id", Action::C)]), // Receiving AE
-    ("300A,073A", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Recorded RT Control Point DateTime
-    ("3010,000B", Action::U, &[("rtn_uids", Action::K)]), // Referenced Conceptual Volume UID
-    ("0040,A13A", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Referenced DateTime
-    ("0400,0402", Action::X, &[]), // Referenced Digital Signature Sequence
-    ("300A,0083", Action::U, &[("rtn_uids", Action::K)]), // Referenced Dose Reference UID
-    ("3010,006F", Action::U, &[("rtn_uids", Action::K)]), // Referenced Dosimetric Objective UID
-    ("3010,0031", Action::U, &[("rtn_uids", Action::K)]), // Referenced Fiducials UID
-    ("3006,0024", Action::U, &[("rtn_uids", Action::K)]), // Referenced Frame of Reference UID
+    (
+        "300A,073A",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Recorded RT Control Point DateTime
+    ("3010,000B", Action::U, &[("rtn_uids", Action::K)]),   // Referenced Conceptual Volume UID
+    (
+        "0040,A13A",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Referenced DateTime
+    ("0400,0402", Action::X, &[]),                          // Referenced Digital Signature Sequence
+    ("300A,0083", Action::U, &[("rtn_uids", Action::K)]),   // Referenced Dose Reference UID
+    ("3010,006F", Action::U, &[("rtn_uids", Action::K)]),   // Referenced Dosimetric Objective UID
+    ("3010,0031", Action::U, &[("rtn_uids", Action::K)]),   // Referenced Fiducials UID
+    ("3006,0024", Action::U, &[("rtn_uids", Action::K)]),   // Referenced Frame of Reference UID
     ("0040,4023", Action::U, &[("rtn_uids", Action::K)]), // Referenced General Purpose Scheduled Procedure Step Transaction UID
     ("0008,1140", Action::Z, &[("rtn_uids", Action::K)]), // Referenced Image Sequence
     ("0040,A172", Action::U, &[("rtn_uids", Action::K)]), // Referenced Observation UID (Trial)
-    ("0038,0004", Action::X, &[]), // Referenced Patient Alias Sequence
-    ("0010,1100", Action::X, &[]), // Referenced Patient Photo Sequence
+    ("0038,0004", Action::X, &[]),                        // Referenced Patient Alias Sequence
+    ("0010,1100", Action::X, &[]),                        // Referenced Patient Photo Sequence
     ("0008,1120", Action::X, &[("rtn_uids", Action::K)]), // Referenced Patient Sequence
     ("0008,1111", Action::Z, &[("rtn_uids", Action::K)]), // Referenced Performed Procedure Step Sequence
-    ("0400,0403", Action::X, &[]), // Referenced SOP Instance MAC Sequence
+    ("0400,0403", Action::X, &[]),                        // Referenced SOP Instance MAC Sequence
     ("0008,1155", Action::U, &[("rtn_uids", Action::K)]), // Referenced SOP Instance UID
     ("0004,1511", Action::U, &[("rtn_uids", Action::K)]), // Referenced SOP Instance UID in File
     ("0008,1110", Action::Z, &[("rtn_uids", Action::K)]), // Referenced Study Sequence
     ("300A,0785", Action::U, &[("rtn_uids", Action::K)]), // Referenced Treatment Position Group UID
-    ("0008,0092", Action::X, &[]), // Referring Physician's Address
-    ("0008,0090", Action::Z, &[]), // Referring Physician's Name
-    ("0008,0094", Action::X, &[]), // Referring Physician's Telephone Numbers
+    ("0008,0092", Action::X, &[]),                        // Referring Physician's Address
+    ("0008,0090", Action::Z, &[]),                        // Referring Physician's Name
+    ("0008,0094", Action::X, &[]),                        // Referring Physician's Telephone Numbers
     ("0008,0096", Action::X, &[]), // Referring Physician Identification Sequence
     ("0010,2152", Action::X, &[]), // Region of Residence
     ("3006,00C2", Action::U, &[("rtn_uids", Action::K)]), // Related Frame of Reference UID
@@ -468,173 +1231,606 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("0032,1032", Action::X, &[]), // Requesting Physician
     ("0032,1033", Action::X, &[("clean_desc", Action::C)]), // Requesting Service
     ("0018,9185", Action::X, &[("clean_desc", Action::C)]), // Respiratory Motion Compensation Technique Description
-    ("0010,2299", Action::X, &[]), // Responsible Organization
-    ("0010,2297", Action::X, &[]), // Responsible Person
+    ("0010,2299", Action::X, &[]),                          // Responsible Organization
+    ("0010,2297", Action::X, &[]),                          // Responsible Person
     ("4008,4000", Action::X, &[("clean_desc", Action::C)]), // Results Comments
-    ("4008,0118", Action::X, &[]), // Results Distribution List Sequence
-    ("4008,0040", Action::X, &[]), // Results ID
-    ("4008,0042", Action::X, &[]), // Results ID Issuer
+    ("4008,0118", Action::X, &[]),                          // Results Distribution List Sequence
+    ("4008,0040", Action::X, &[]),                          // Results ID
+    ("4008,0042", Action::X, &[]),                          // Results ID Issuer
     ("0008,0054", Action::X, &[("rtn_dev_id", Action::C)]), // Retrieve AE Title
-    ("300E,0004", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Review Date
-    ("300E,0008", Action::Z, &[]), // Reviewer Name
-    ("300E,0005", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Review Time
-    ("3006,004D", Action::X, &[]), // ROI Creator Sequence
-    ("3006,002D", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // ROI DateTime
+    (
+        "300E,0004",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Review Date
+    ("300E,0008", Action::Z, &[]),                          // Reviewer Name
+    (
+        "300E,0005",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Review Time
+    ("3006,004D", Action::X, &[]),                          // ROI Creator Sequence
+    (
+        "3006,002D",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // ROI DateTime
     ("3006,0028", Action::X, &[("clean_desc", Action::C)]), // ROI Description
     ("3006,0038", Action::X, &[("clean_desc", Action::C)]), // ROI Generation Description
-    ("3006,00A6", Action::Z, &[]), // ROI Interpreter
-    ("3006,004E", Action::X, &[]), // ROI Interpreter Sequence
+    ("3006,00A6", Action::Z, &[]),                          // ROI Interpreter
+    ("3006,004E", Action::X, &[]),                          // ROI Interpreter Sequence
     ("3006,0026", Action::Z, &[("clean_desc", Action::C)]), // ROI Name
-    ("3006,002E", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // ROI Observation DateTime
+    (
+        "3006,002E",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // ROI Observation DateTime
     ("3006,0088", Action::X, &[("clean_desc", Action::C)]), // ROI Observation Description
     ("3006,0085", Action::X, &[("clean_desc", Action::C)]), // ROI Observation Label
-    ("300A,0615", Action::Z, &[]), // RT Accessory Device Slot ID
-    ("300A,0611", Action::Z, &[]), // RT Accessory Holder Slot ID
+    ("300A,0615", Action::Z, &[]),                          // RT Accessory Device Slot ID
+    ("300A,0611", Action::Z, &[]),                          // RT Accessory Holder Slot ID
     ("3010,005A", Action::Z, &[("clean_desc", Action::C)]), // RT Physician Intent Narrative
-    ("300A,0006", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // RT Plan Date
+    (
+        "300A,0006",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // RT Plan Date
     ("300A,0004", Action::X, &[("clean_desc", Action::C)]), // RT Plan Description
     ("300A,0002", Action::D, &[("clean_desc", Action::C)]), // RT Plan Label
     ("300A,0003", Action::X, &[("clean_desc", Action::C)]), // RT Plan Name
-    ("300A,0007", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // RT Plan Time
+    (
+        "300A,0007",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // RT Plan Time
     ("3010,0054", Action::D, &[("clean_desc", Action::C)]), // RT Prescription Label
     ("300A,062A", Action::D, &[("clean_desc", Action::C)]), // RT Tolerance Set Label
     ("3010,0056", Action::D, &[("clean_desc", Action::C)]), // RT Treatment Approach Label
-    ("3010,003B", Action::U, &[("rtn_uids", Action::K)]), // RT Treatment Phase UID
-    ("3008,0162", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Safe Position Exit Date
-    ("3008,0164", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Safe Position Exit Time
-    ("3008,0166", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Safe Position Return Date
-    ("3008,0168", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Safe Position Return Time
-    ("0038,001A", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Admission Date
-    ("0038,001B", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Admission Time
-    ("0038,001C", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Discharge Date
-    ("0038,001D", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Discharge Time
-    ("0040,4034", Action::X, &[]), // Scheduled Human Performers Sequence
+    ("3010,003B", Action::U, &[("rtn_uids", Action::K)]),   // RT Treatment Phase UID
+    (
+        "3008,0162",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Safe Position Exit Date
+    (
+        "3008,0164",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Safe Position Exit Time
+    (
+        "3008,0166",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Safe Position Return Date
+    (
+        "3008,0168",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Safe Position Return Time
+    (
+        "0038,001A",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Admission Date
+    (
+        "0038,001B",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Admission Time
+    (
+        "0038,001C",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Discharge Date
+    (
+        "0038,001D",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Discharge Time
+    ("0040,4034", Action::X, &[]),                          // Scheduled Human Performers Sequence
     ("0038,001E", Action::X, &[]), // Scheduled Patient Institution Residence
     ("0040,0006", Action::X, &[]), // Scheduled Performing Physician's Name
     ("0040,000B", Action::X, &[]), // Scheduled Performing Physician Identification Sequence
     ("0040,0007", Action::X, &[("clean_desc", Action::C)]), // Scheduled Procedure Step Description
-    ("0040,0004", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step End Date
-    ("0040,0005", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step End Time
-    ("0040,4008", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step Expiration DateTime
+    (
+        "0040,0004",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step End Date
+    (
+        "0040,0005",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step End Time
+    (
+        "0040,4008",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step Expiration DateTime
     ("0040,0009", Action::X, &[]), // Scheduled Procedure Step ID
     ("0040,0011", Action::X, &[("rtn_dev_id", Action::K)]), // Scheduled Procedure Step Location
-    ("0040,4010", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step Modification DateTime
-    ("0040,0002", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step Start Date
-    ("0040,4005", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step Start DateTime
-    ("0040,0003", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Procedure Step Start Time
+    (
+        "0040,4010",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step Modification DateTime
+    (
+        "0040,0002",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step Start Date
+    (
+        "0040,4005",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step Start DateTime
+    (
+        "0040,0003",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Procedure Step Start Time
     ("0040,0001", Action::X, &[("rtn_dev_id", Action::C)]), // Scheduled Station AE Title
     ("0040,4027", Action::X, &[("rtn_dev_id", Action::K)]), // Scheduled Station Geographic Location Code Sequence
     ("0040,0010", Action::X, &[("rtn_dev_id", Action::K)]), // Scheduled Station Name
     ("0040,4025", Action::X, &[("rtn_dev_id", Action::K)]), // Scheduled Station Name Code Sequence
     ("0032,1020", Action::X, &[("rtn_dev_id", Action::K)]), // Scheduled Study Location
     ("0032,1021", Action::X, &[("rtn_dev_id", Action::C)]), // Scheduled Study Location AE Title
-    ("0032,1000", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Study Start Date
-    ("0032,1001", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Study Start Time
-    ("0032,1010", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Study Stop Date
-    ("0032,1011", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Scheduled Study Stop Time
+    (
+        "0032,1000",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Study Start Date
+    (
+        "0032,1001",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Study Start Time
+    (
+        "0032,1010",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Study Stop Date
+    (
+        "0032,1011",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Scheduled Study Stop Time
     ("0018,1010", Action::X, &[("rtn_dev_id", Action::K)]), // Secondary Capture Device ID
     ("0008,1303", Action::X, &[("clean_desc", Action::C)]), // Secondary Diagnoses Code Sequence
-    ("0040,B036", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Segment Definition DateTime
+    (
+        "0040,B036",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Segment Definition DateTime
     ("0072,005E", Action::D, &[("rtn_dev_id", Action::C)]), // Selector AE Value
     ("0072,005F", Action::D, &[("rtn_pat_chars", Action::K)]), // Selector AS Value
-    ("0072,0061", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Selector DA Value
-    ("0072,0063", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Selector DT Value
+    (
+        "0072,0061",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Selector DA Value
+    (
+        "0072,0063",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Selector DT Value
     ("0072,0066", Action::D, &[("clean_desc", Action::C)]), // Selector LO Value
     ("0072,0068", Action::D, &[("clean_desc", Action::C)]), // Selector LT Value
-    ("0072,0065", Action::D, &[]), // Selector OB Value
-    ("0072,006A", Action::D, &[]), // Selector PN Value
+    ("0072,0065", Action::D, &[]),                          // Selector OB Value
+    ("0072,006A", Action::D, &[]),                          // Selector PN Value
     ("0072,006C", Action::D, &[("clean_desc", Action::C)]), // Selector SH Value
     ("0072,006E", Action::D, &[("clean_desc", Action::C)]), // Selector ST Value
-    ("0072,006B", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Selector TM Value
-    ("0072,006D", Action::D, &[]), // Selector UN Value
-    ("0072,0071", Action::D, &[]), // Selector UR Value
+    (
+        "0072,006B",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Selector TM Value
+    ("0072,006D", Action::D, &[]),                          // Selector UN Value
+    ("0072,0071", Action::D, &[]),                          // Selector UR Value
     ("0072,0070", Action::D, &[("clean_desc", Action::C)]), // Selector UT Value
-    ("0008,0021", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Series Date
+    (
+        "0008,0021",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Series Date
     ("0008,103E", Action::X, &[("clean_desc", Action::C)]), // Series Description
-    ("0020,000E", Action::U, &[("rtn_uids", Action::K)]), // Series Instance UID
-    ("0008,0031", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Series Time
+    ("0020,000E", Action::U, &[("rtn_uids", Action::K)]),   // Series Instance UID
+    (
+        "0008,0031",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Series Time
     ("0038,0062", Action::X, &[("clean_desc", Action::C)]), // Service Episode Description
-    ("0038,0060", Action::X, &[]), // Service Episode ID
+    ("0038,0060", Action::X, &[]),                          // Service Episode ID
     ("300A,01B2", Action::X, &[("clean_desc", Action::C)]), // Setup Technique Description
     ("0010,0046", Action::X, &[("rtn_pat_chars", Action::K)]), // Sex Parameters for Clinical Use Category Code Sequence
-    ("0010,0042", Action::X, &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)]), // Sex Parameters for Clinical Use Category Comment
+    (
+        "0010,0042",
+        Action::X,
+        &[("rtn_pat_chars", Action::C), ("clean_desc", Action::C)],
+    ), // Sex Parameters for Clinical Use Category Comment
     ("0010,0047", Action::X, &[("rtn_pat_chars", Action::K)]), // Sex Parameters for Clinical Use Category Reference
     ("0010,0043", Action::X, &[("rtn_pat_chars", Action::K)]), // Sex Parameters for Clinical Use Category Sequence
-    ("300A,01A6", Action::X, &[("clean_desc", Action::C)]), // Shielding Device Description
-    ("0040,06FA", Action::X, &[]), // Slide Identifier
+    ("300A,01A6", Action::X, &[("clean_desc", Action::C)]),    // Shielding Device Description
+    ("0040,06FA", Action::X, &[]),                             // Slide Identifier
     ("0010,21A0", Action::X, &[("rtn_pat_chars", Action::K)]), // Smoking Status
-    ("0100,0420", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // SOP Authorization DateTime
-    ("0008,0018", Action::U, &[("rtn_uids", Action::K)]), // SOP Instance UID
-    ("3010,0015", Action::U, &[("rtn_uids", Action::K)]), // Source Conceptual Volume UID
-    ("0018,936A", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Source End DateTime
-    ("0064,0003", Action::U, &[("rtn_uids", Action::K)]), // Source Frame of Reference UID
-    ("0034,0005", Action::D, &[]), // Source Identifier
-    ("0008,2112", Action::Z, &[("rtn_uids", Action::K)]), // Source Image Sequence
-    ("300A,0216", Action::X, &[("rtn_dev_id", Action::K)]), // Source Manufacturer
-    ("0400,0564", Action::Z, &[("rtn_inst_id", Action::K)]), // Source of Previous Values
-    ("3008,0105", Action::Z, &[("rtn_dev_id", Action::K)]), // Source Serial Number
-    ("0018,9369", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Source Start DateTime
-    ("300A,022C", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Source Strength Reference Date
-    ("300A,022E", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Source Strength Reference Time
+    (
+        "0100,0420",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // SOP Authorization DateTime
+    ("0008,0018", Action::U, &[("rtn_uids", Action::K)]),      // SOP Instance UID
+    ("3010,0015", Action::U, &[("rtn_uids", Action::K)]),      // Source Conceptual Volume UID
+    (
+        "0018,936A",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Source End DateTime
+    ("0064,0003", Action::U, &[("rtn_uids", Action::K)]),      // Source Frame of Reference UID
+    ("0034,0005", Action::D, &[]),                             // Source Identifier
+    ("0008,2112", Action::Z, &[("rtn_uids", Action::K)]),      // Source Image Sequence
+    ("300A,0216", Action::X, &[("rtn_dev_id", Action::K)]),    // Source Manufacturer
+    ("0400,0564", Action::Z, &[("rtn_inst_id", Action::K)]),   // Source of Previous Values
+    ("3008,0105", Action::Z, &[("rtn_dev_id", Action::K)]),    // Source Serial Number
+    (
+        "0018,9369",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Source Start DateTime
+    (
+        "300A,022C",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Source Strength Reference Date
+    (
+        "300A,022E",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Source Strength Reference Time
     ("0038,0050", Action::X, &[("rtn_pat_chars", Action::C)]), // Special Needs
-    ("0040,050A", Action::X, &[]), // Specimen Accession Number
-    ("0040,0602", Action::X, &[("clean_desc", Action::C)]), // Specimen Detailed Description
-    ("0040,0551", Action::D, &[]), // Specimen Identifier
-    ("0040,0610", Action::Z, &[("clean_struct", Action::C)]), // Specimen Preparation Sequence
-    ("0040,0600", Action::X, &[("clean_desc", Action::C)]), // Specimen Short Description
-    ("0040,0554", Action::U, &[("rtn_uids", Action::K)]), // Specimen UID
-    ("0018,9516", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Start Acquisition DateTime
-    ("0008,0055", Action::X, &[("rtn_dev_id", Action::C)]), // Station AE Title
-    ("0008,1010", Action::Z, &[("rtn_dev_id", Action::K)]), // Station Name
-    ("0088,0140", Action::U, &[("rtn_uids", Action::K)]), // Storage Media File-set UID
-    ("3006,0008", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Structure Set Date
-    ("3006,0006", Action::X, &[("clean_desc", Action::C)]), // Structure Set Description
-    ("3006,0002", Action::D, &[("clean_desc", Action::C)]), // Structure Set Label
-    ("3006,0004", Action::X, &[("clean_desc", Action::C)]), // Structure Set Name
-    ("3006,0009", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Structure Set Time
-    ("0032,1040", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Arrival Date
-    ("0032,1041", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Arrival Time
-    ("0032,4000", Action::X, &[("clean_desc", Action::C)]), // Study Comments
-    ("0032,1050", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Completion Date
-    ("0032,1051", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Completion Time
-    ("0008,0020", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Date
-    ("0008,1030", Action::X, &[("clean_desc", Action::C)]), // Study Description
-    ("0020,0010", Action::Z, &[]), // Study ID
-    ("0032,0012", Action::X, &[]), // Study ID Issuer
-    ("0020,000D", Action::U, &[("rtn_uids", Action::K)]), // Study Instance UID
-    ("0032,0034", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Read Date
-    ("0032,0035", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Read Time
-    ("0008,0030", Action::Z, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Time
-    ("0032,0032", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Verified Date
-    ("0032,0033", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Study Verified Time
-    ("0044,0010", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Substance Administration DateTime
+    ("0040,050A", Action::X, &[]),                             // Specimen Accession Number
+    ("0040,0602", Action::X, &[("clean_desc", Action::C)]),    // Specimen Detailed Description
+    ("0040,0551", Action::D, &[]),                             // Specimen Identifier
+    ("0040,0610", Action::Z, &[("clean_struct", Action::C)]),  // Specimen Preparation Sequence
+    ("0040,0600", Action::X, &[("clean_desc", Action::C)]),    // Specimen Short Description
+    ("0040,0554", Action::U, &[("rtn_uids", Action::K)]),      // Specimen UID
+    (
+        "0018,9516",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Start Acquisition DateTime
+    ("0008,0055", Action::X, &[("rtn_dev_id", Action::C)]),    // Station AE Title
+    ("0008,1010", Action::Z, &[("rtn_dev_id", Action::K)]),    // Station Name
+    ("0088,0140", Action::U, &[("rtn_uids", Action::K)]),      // Storage Media File-set UID
+    (
+        "3006,0008",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Structure Set Date
+    ("3006,0006", Action::X, &[("clean_desc", Action::C)]),    // Structure Set Description
+    ("3006,0002", Action::D, &[("clean_desc", Action::C)]),    // Structure Set Label
+    ("3006,0004", Action::X, &[("clean_desc", Action::C)]),    // Structure Set Name
+    (
+        "3006,0009",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Structure Set Time
+    (
+        "0032,1040",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Arrival Date
+    (
+        "0032,1041",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Arrival Time
+    ("0032,4000", Action::X, &[("clean_desc", Action::C)]),    // Study Comments
+    (
+        "0032,1050",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Completion Date
+    (
+        "0032,1051",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Completion Time
+    (
+        "0008,0020",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Date
+    ("0008,1030", Action::X, &[("clean_desc", Action::C)]),    // Study Description
+    ("0020,0010", Action::Z, &[]),                             // Study ID
+    ("0032,0012", Action::X, &[]),                             // Study ID Issuer
+    ("0020,000D", Action::U, &[("rtn_uids", Action::K)]),      // Study Instance UID
+    (
+        "0032,0034",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Read Date
+    (
+        "0032,0035",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Read Time
+    (
+        "0008,0030",
+        Action::Z,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Time
+    (
+        "0032,0032",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Verified Date
+    (
+        "0032,0033",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Study Verified Time
+    (
+        "0044,0010",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Substance Administration DateTime
     ("0020,0200", Action::U, &[("rtn_uids", Action::K)]), // Synchronization Frame of Reference UID
     ("300A,0054", Action::U, &[("rtn_uids", Action::K)]), // Table Top Position Alignment UID
     ("0018,2042", Action::U, &[("rtn_uids", Action::K)]), // Target UID
-    ("0040,A354", Action::X, &[]), // Telephone Number (Trial)
+    ("0040,A354", Action::X, &[]),                        // Telephone Number (Trial)
     ("0040,DB0D", Action::U, &[("rtn_uids", Action::K)]), // Template Extension Creator UID
     ("0040,DB0C", Action::U, &[("rtn_uids", Action::K)]), // Template Extension Organization UID
-    ("0040,DB07", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Template Local Version
-    ("0040,DB06", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Template Version
-    ("4000,4000", Action::X, &[]), // Text Comments
-    ("2030,0020", Action::X, &[]), // Text String
-    ("0010,0014", Action::X, &[]), // Third Person Pronouns Sequence
-    ("0040,A122", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Time
-    ("0040,A112", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Time of Document Creation or Verbal Transaction (Trial)
-    ("0018,1201", Action::X, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Time of Last Calibration
-    ("0018,700E", Action::D, &[("rtn_dev_id", Action::K), ("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Time of Last Detector Calibration
-    ("0018,1014", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Time of Secondary Capture
-    ("0008,0201", Action::X, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Timezone Offset From UTC
-    ("0088,0910", Action::X, &[]), // Topic Author
-    ("0088,0912", Action::X, &[]), // Topic Keywords
-    ("0088,0906", Action::X, &[]), // Topic Subject
-    ("0088,0904", Action::X, &[]), // Topic Title
+    (
+        "0040,DB07",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Template Local Version
+    (
+        "0040,DB06",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Template Version
+    ("4000,4000", Action::X, &[]),                        // Text Comments
+    ("2030,0020", Action::X, &[]),                        // Text String
+    ("0010,0014", Action::X, &[]),                        // Third Person Pronouns Sequence
+    (
+        "0040,A122",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Time
+    (
+        "0040,A112",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Time of Document Creation or Verbal Transaction (Trial)
+    (
+        "0018,1201",
+        Action::X,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Time of Last Calibration
+    (
+        "0018,700E",
+        Action::D,
+        &[
+            ("rtn_dev_id", Action::K),
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Time of Last Detector Calibration
+    (
+        "0018,1014",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Time of Secondary Capture
+    (
+        "0008,0201",
+        Action::X,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Timezone Offset From UTC
+    ("0088,0910", Action::X, &[]),                        // Topic Author
+    ("0088,0912", Action::X, &[]),                        // Topic Keywords
+    ("0088,0906", Action::X, &[]),                        // Topic Subject
+    ("0088,0904", Action::X, &[]),                        // Topic Title
     ("0062,0021", Action::U, &[("rtn_uids", Action::K)]), // Tracking UID
     ("0008,1195", Action::U, &[("rtn_uids", Action::K)]), // Transaction UID
     ("0018,5011", Action::X, &[("rtn_dev_id", Action::K)]), // Transducer Identification Sequence
-    ("3008,0024", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Treatment Control Point Date
-    ("3008,0025", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Treatment Control Point Time
-    ("3008,0250", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Treatment Date
+    (
+        "3008,0024",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Treatment Control Point Date
+    (
+        "3008,0025",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Treatment Control Point Time
+    (
+        "3008,0250",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Treatment Date
     ("300A,00B2", Action::Z, &[("rtn_dev_id", Action::K)]), // Treatment Machine Name
     ("300A,0608", Action::D, &[("clean_desc", Action::C)]), // Treatment Position Group Label
     ("300A,0609", Action::U, &[("rtn_uids", Action::K)]), // Treatment Position Group UID
@@ -642,18 +1838,39 @@ pub const E11: &[(&str, Action, &[(&str, Action)])] = &[
     ("3010,0077", Action::D, &[("clean_desc", Action::C)]), // Treatment Site
     ("300A,000B", Action::X, &[("clean_desc", Action::C)]), // Treatment Sites
     ("3010,007A", Action::Z, &[("clean_desc", Action::C)]), // Treatment Technique Notes
-    ("3008,0251", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Treatment Time
-    ("300A,0736", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Treatment Tolerance Violation DateTime
+    (
+        "3008,0251",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Treatment Time
+    (
+        "300A,0736",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Treatment Tolerance Violation DateTime
     ("300A,0734", Action::D, &[("clean_desc", Action::C)]), // Treatment Tolerance Violation Description
     ("0018,100A", Action::X, &[("rtn_dev_id", Action::K)]), // UDI Sequence
-    ("0040,A124", Action::U, &[]), // UID
+    ("0040,A124", Action::U, &[]),                          // UID
     ("0070,0006", Action::D, &[("clean_desc", Action::C)]), // Unformatted Text Value
     ("0018,1009", Action::X, &[("rtn_dev_id", Action::K)]), // Unique Device Identifier
     ("3010,0033", Action::D, &[("clean_desc", Action::C)]), // User Content Label
     ("3010,0034", Action::D, &[("clean_desc", Action::C)]), // User Content Long Label
-    ("0040,A352", Action::X, &[]), // Verbal Source (Trial)
+    ("0040,A352", Action::X, &[]),                          // Verbal Source (Trial)
     ("0040,A358", Action::X, &[]), // Verbal Source Identifier Code Sequence (Trial)
-    ("0040,A030", Action::D, &[("rtn_long_full_dates", Action::K), ("rtn_long_modif_dates", Action::C)]), // Verification DateTime
+    (
+        "0040,A030",
+        Action::D,
+        &[
+            ("rtn_long_full_dates", Action::K),
+            ("rtn_long_modif_dates", Action::C),
+        ],
+    ), // Verification DateTime
     ("0040,A088", Action::Z, &[]), // Verifying Observer Identification Code Sequence
     ("0040,A075", Action::D, &[]), // Verifying Observer Name
     ("0040,A073", Action::D, &[]), // Verifying Observer Sequence

@@ -7,7 +7,11 @@ pub fn write_fixture(path: &Path, name: &str, study_uid: &str) {
     let obj = InMemDicomObject::from_element_iter([
         DataElement::new(dicom_dictionary_std::tags::PATIENT_NAME, VR::PN, name),
         DataElement::new(dicom_dictionary_std::tags::PATIENT_ID, VR::LO, "PID-1"),
-        DataElement::new(dicom_dictionary_std::tags::STUDY_INSTANCE_UID, VR::UI, study_uid),
+        DataElement::new(
+            dicom_dictionary_std::tags::STUDY_INSTANCE_UID,
+            VR::UI,
+            study_uid,
+        ),
         DataElement::new(
             dicom_dictionary_std::tags::SOP_CLASS_UID,
             VR::UI,
