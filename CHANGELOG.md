@@ -74,6 +74,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Fixed
+
+- **A date that could not be shifted was passed through verbatim.** Under the Modified Dates
+  option a malformed date (`2024010 `, `202401`) survived unchanged — silently, and without
+  even being counted as a change — so the option's promise that the original date is not
+  recoverable failed for exactly the values the code could not parse. Unshiftable dates are
+  now emptied (element kept, value zero-length), matching how the default profile treats
+  dates; times are still retained. **Behaviour change** for `--config` users.
 - **`retain_safe_private` was described as PS3.15's "Retain Safe Private" option, but it
   retains every private attribute** — no allow-list is consulted, so an identifying private
   element survives. The spec disclosed the approximation; the README option table and the

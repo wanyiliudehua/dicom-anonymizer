@@ -306,6 +306,9 @@ the new SOP Instance UID, so the original instance UID cannot leak via the filen
   not shifted.
 - `retain_longitudinal_full_dates` keeps dates verbatim; otherwise each date/time takes
   its E.1-1 action (`Z`/`D`/`X`). `[dates] strategy = "remove"` forces deletion.
+- Under the Modified Dates option a date that cannot be shifted (malformed, wrong length)
+  is **emptied** (`Z`), never passed through: the option promises the original date is not
+  recoverable, so "unparseable" must not mean "keep the original". Times are still kept.
 
 **Limit:** with the default random salts, output is not reproducible across runs and
 cannot be reversed.
@@ -447,7 +450,7 @@ Current suite: **80 unit + 4 integration tests**.
 - **Unit:** E.1-1 table size/anchors; option overrides (basic vs with-option); strategy
   override; action semantics (X/Z/D/U/K, VR-aware `D`); sequence `X` removal and
   recursion; repeating groups; private tags; UID determinism/collision-freedom; date
-  offset determinism and malformed-date pass-through; mask geometry/bounds; region
+  offset determinism and clearing of unshiftable dates; mask geometry/bounds; region
   selection; `PixelReport`; JPEG-LS feature gate; discovery (DICOM + non-DICOM);
   config parsing/validation.
 - **Integration (`tests/integration.rs`):** built-binary end-to-end over a generated
@@ -631,6 +634,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Progress reporting** was added beyond the plan: a batch can run for hours, and the
   only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
   a terminal, so redirected output stays byte-identical to before.
+- **Unshiftable dates are cleared rather than passed through** (found in review, a
+  behaviour change): the old rule let a malformed date survive verbatim and uncounted,
+  which broke the Modified Dates option's promise for exactly the inputs it could not
+  parse. Same defect class as the 32-bit masking silent no-op above: a transformation that
+  cannot be performed must not quietly pass the original value through.
 - **`retain_safe_private` no longer claims to be PS3.15's "Retain Safe Private".** The spec
   admitted the approximation, but the README option table and the example config - the two
   places a user actually reads - described it as "keep safe private attributes", while the

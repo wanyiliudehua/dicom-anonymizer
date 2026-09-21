@@ -262,9 +262,19 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                         8 => ctx.dates.shift_da(&v, offset),
                         _ => ctx.dates.shift_dt(&v, offset),
                     };
-                    if let Some(s) = shifted {
-                        ds::set_string(obj, tag, vr, &s);
-                        changed += 1;
+                    match shifted {
+                        Some(s) => {
+                            ds::set_string(obj, tag, vr, &s);
+                            changed += 1;
+                        }
+                        // The option promises the original date is not recoverable, so a value
+                        // this code cannot shift is emptied rather than passed through - keeping
+                        // it would be a silent hole in that promise, and an uncounted one.
+                        None => {
+                            if ds::zero(obj, tag) {
+                                changed += 1;
+                            }
+                        }
                     }
                 }
                 continue;
@@ -410,7 +420,11 @@ mod tests {
     }
 
     #[test]
-    fn date_shift_applied_and_malformed_left_alone() {
+    fn date_shift_applied_and_unshiftable_dates_cleared() {
+        // Under the Modified Dates option a date must not survive as-is: the point of the
+        // option is that the original date is not recoverable. "I could not parse it" used
+        // to mean "keep the original", which was a silent hole in that promise - and because
+        // nothing was written, tags_changed did not even record it.
         let cfg =
             Config::from_toml_str("[profile]\nretain_longitudinal_temporal = true\n").unwrap();
         let u = UidMapper::new("2.25.", b"s");
@@ -419,13 +433,26 @@ mod tests {
         let mut o = InMemDicomObject::from_element_iter([
             DataElement::new(Tag(0x0008, 0x0020), VR::DA, "20240101"),
             DataElement::new(Tag(0x0008, 0x0021), VR::DA, "2024"),
+            DataElement::new(Tag(0x0008, 0x002A), VR::DT, "2024"),
+            DataElement::new(Tag(0x0008, 0x0030), VR::TM, "120000"),
         ]);
         apply(&mut o, &c).unwrap();
+
         let shifted = crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0020)).unwrap();
         assert_ne!(shifted, "20240101");
+        // unshiftable values are emptied rather than passed through
         assert_eq!(
             crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0021)).as_deref(),
-            Some("2024")
+            Some("")
+        );
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x002A)).as_deref(),
+            Some("")
+        );
+        // times are retained by this option; only dates are shifted
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0030)).as_deref(),
+            Some("120000")
         );
     }
 
