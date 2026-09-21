@@ -41,10 +41,103 @@ fn repeating_group_action(tag: Tag) -> Option<Action> {
 
 /// Apply the effective rules to `obj`, recursing into sequences.
 /// Returns the number of elements changed.
+/// Attribute groups whose values identify the subject, used for text scrubbing.
+const ID_PLAIN: &[Tag] = &[
+    Tag(0x0010, 0x0020), // Patient ID
+    Tag(0x0010, 0x1000), // Other Patient IDs
+    Tag(0x0008, 0x0050), // Accession Number
+];
+const ID_NAMES: &[Tag] = &[
+    Tag(0x0010, 0x0010), // Patient's Name
+    Tag(0x0010, 0x1001), // Other Patient Names
+    Tag(0x0008, 0x0090), // Referring Physician's Name
+    Tag(0x0008, 0x1050), // Performing Physician's Name
+    Tag(0x0008, 0x1070), // Operators' Name
+];
+const ID_ORGS: &[Tag] = &[
+    Tag(0x0008, 0x0080), // Institution Name
+    Tag(0x0008, 0x0081), // Institution Address
+    Tag(0x0008, 0x1040), // Institutional Department Name
+];
+
+/// Identifying strings from this object, gathered *before* it is anonymized and
+/// used to scrub free-text descriptor fields (the E.1-1 "Clean" options).
+///
+/// Names contribute their components; institution-like values also contribute
+/// their (length-filtered) words, because descriptors often carry a *substring*
+/// of the institution rather than the whole string.
+fn collect_identifiers(obj: &InMemDicomObject) -> Vec<String> {
+    let mut ids = Vec::new();
+    for (tags, min, split) in [
+        (ID_PLAIN, 3usize, false),
+        (ID_NAMES, 3, true),
+        (ID_ORGS, 4, true),
+    ] {
+        for tag in tags {
+            let Some(value) = ds::get_string(obj, *tag) else {
+                continue;
+            };
+            add_identifier(&mut ids, &value, min, split);
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn add_identifier(ids: &mut Vec<String>, raw: &str, min: usize, split: bool) {
+    let s = raw.trim();
+    if s.is_empty() || !s.is_ascii() {
+        return;
+    }
+    let ok = |t: &str| t.chars().count() >= min && t.is_ascii();
+    if ok(s) {
+        ids.push(s.to_string());
+    }
+    if split {
+        for tok in s.split(|c: char| {
+            c.is_whitespace() || matches!(c, '^' | '=' | ',' | ';' | '(' | ')' | '/')
+        }) {
+            let t = tok.trim();
+            if ok(t) {
+                ids.push(t.to_string());
+            }
+        }
+    }
+}
+
+/// Remove each identifier (case-insensitive) from a text value. A value with no
+/// match is returned unchanged.
+fn scrub(text: &str, ids: &[String]) -> String {
+    if !text.is_ascii() {
+        return text.to_string();
+    }
+    let mut out = text.to_string();
+    for id in ids {
+        let needle = id.to_ascii_lowercase();
+        if needle.is_empty() {
+            continue;
+        }
+        loop {
+            let lower = out.to_ascii_lowercase();
+            match lower.find(&needle) {
+                Some(pos) => out.replace_range(pos..pos + needle.len(), ""),
+                None => break,
+            }
+        }
+    }
+    out.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_matches(|c| c == '^' || c == ' ')
+        .to_string()
+}
+
 pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
     let rules: std::collections::HashMap<Tag, Action> =
         effective_rules(ctx.cfg)?.into_iter().collect();
     let patient_id = ds::get_string(obj, Tag(0x0010, 0x0020)).unwrap_or_default();
+    let identifiers = collect_identifiers(obj);
     let offset = ctx.dates.offset_for(&patient_id);
     let mut changed = 0usize;
 
@@ -148,9 +241,20 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                 }
             }
             Action::C => {
-                let value = dummy_for(vr, "ANONYMOUS");
-                ds::set_string(obj, tag, vr, &value);
-                changed += 1;
+                match ds::get_string(obj, tag) {
+                    // Clean: drop this object's own identifiers, keep the rest.
+                    Some(text) => {
+                        let cleaned = scrub(&text, &identifiers);
+                        ds::set_string(obj, tag, vr, &cleaned);
+                        changed += 1;
+                    }
+                    // Not a text value: neutralize instead.
+                    None => {
+                        let value = dummy_for(vr, "ANONYMOUS");
+                        ds::set_string(obj, tag, vr, &value);
+                        changed += 1;
+                    }
+                }
             }
             Action::X | Action::K => {}
         }
@@ -442,6 +546,39 @@ mod tests {
         assert_eq!(
             crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0020)).as_deref(),
             Some("20240101")
+        );
+    }
+
+    #[test]
+    fn clean_action_scrubs_identifiers_and_keeps_text() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        // Institution is the identifier to scrub; it is collected before removal.
+        // The descriptor carries only a substring of it, so tokens must match too.
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(
+                Tag(0x0008, 0x0080),
+                VR::LO,
+                "WanNan Medical College YiJiShan Hospital",
+            ),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "YiJiShan Hospital^l-spine"),
+            DataElement::new(Tag(0x0008, 0x103E), VR::LO, "localizer"),
+        ]);
+        apply(&mut o, &c).unwrap();
+        // identifier stripped, useful text kept
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("l-spine")
+        );
+        // no identifier present -> unchanged
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x103E)).as_deref(),
+            Some("localizer")
         );
     }
 }
