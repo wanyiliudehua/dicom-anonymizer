@@ -3,6 +3,7 @@ mod config;
 mod deid;
 mod discovery;
 mod error;
+mod pipeline;
 mod pixel;
 mod writer;
 
