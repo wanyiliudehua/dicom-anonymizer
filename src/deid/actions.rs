@@ -16,20 +16,6 @@ pub struct DeidContext<'a> {
     pub dates: &'a DateShifter,
 }
 
-const DATE_TAGS: &[Tag] = &[
-    Tag(0x0008, 0x0012), // Instance Creation Date
-    Tag(0x0008, 0x0020), // Study Date
-    Tag(0x0008, 0x0021), // Series Date
-    Tag(0x0008, 0x0022), // Acquisition Date
-    Tag(0x0008, 0x0023), // Content Date
-    Tag(0x0008, 0x002A), // Acquisition DateTime
-    Tag(0x0008, 0x0030), // Study Time
-];
-
-fn is_date_tag(tag: Tag) -> bool {
-    DATE_TAGS.contains(&tag)
-}
-
 /// A dummy value that is valid for common value representations (E.1-1 `D`).
 fn dummy_for(vr: VR, fallback: &str) -> String {
     match vr {
@@ -103,31 +89,32 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
             continue;
         }
 
-        // Date handling takes precedence for date tags.
-        if is_date_tag(tag) {
-            match ctx.cfg.dates.strategy {
-                DateStrategy::Remove => {
-                    if ds::remove(obj, tag) {
+        let vr = obj.element(tag).map(|e| e.vr()).unwrap_or(VR::LO);
+
+        // Temporal attributes: honor `remove`, and the "modified dates" option
+        // (which resolves to `C`) by shifting rather than replacing.
+        if matches!(vr, VR::DA | VR::DT | VR::TM) {
+            if ctx.cfg.dates.strategy == DateStrategy::Remove {
+                if ds::remove(obj, tag) {
+                    changed += 1;
+                }
+                continue;
+            }
+            if action == Action::C {
+                if vr == VR::TM {
+                    continue; // times are preserved; only dates are shifted
+                }
+                if let Some(v) = ds::get_string(obj, tag) {
+                    let shifted = match v.len() {
+                        8 => ctx.dates.shift_da(&v, offset),
+                        _ => ctx.dates.shift_dt(&v, offset),
+                    };
+                    if let Some(s) = shifted {
+                        ds::set_string(obj, tag, vr, &s);
                         changed += 1;
                     }
-                    continue;
                 }
-                DateStrategy::Shift if ctx.cfg.profile.retain_longitudinal_temporal => {
-                    if let Some(v) = ds::get_string(obj, tag) {
-                        let shifted = match v.len() {
-                            8 => ctx.dates.shift_da(&v, offset),
-                            _ => ctx.dates.shift_dt(&v, offset),
-                        };
-                        if let Some(s) = shifted {
-                            ds::set_string(obj, tag, VR::DA, &s);
-                            changed += 1;
-                        }
-                    }
-                    // Under shifting a date tag is either shifted or left as-is;
-                    // malformed dates pass through instead of falling through to zeroing.
-                    continue;
-                }
-                _ => {}
+                continue;
             }
         }
 
@@ -138,7 +125,6 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                 }
             }
             Action::D => {
-                let vr = obj.element(tag).map(|e| e.vr()).unwrap_or(VR::LO);
                 let value = if vr == VR::UI {
                     ctx.uids.map(&format!("{:04X}{:04X}", tag.0, tag.1))
                 } else {
@@ -165,8 +151,8 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                 }
             }
             Action::C => {
-                let vr = obj.element(tag).map(|e| e.vr()).unwrap_or(VR::LO);
-                ds::set_string(obj, tag, vr, "ANONYMOUS");
+                let value = dummy_for(vr, "ANONYMOUS");
+                ds::set_string(obj, tag, vr, &value);
                 changed += 1;
             }
             Action::X | Action::K => {}
@@ -425,5 +411,24 @@ mod tests {
         )]);
         apply(&mut o, &c).unwrap();
         assert!(o.element(Tag(0x6000, 0x3000)).is_err());
+    }
+
+    #[test]
+    fn full_dates_option_keeps_dates_verbatim() {
+        let cfg =
+            Config::from_toml_str("[profile]\nretain_longitudinal_full_dates = true\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x0020),
+            VR::DA,
+            "20240101",
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0020)).as_deref(),
+            Some("20240101")
+        );
     }
 }

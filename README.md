@@ -63,9 +63,34 @@ to keep. Repeating-group rows that cannot be a single tag — Curve Data
 `(50xx,xxxx)`, Overlay Data/Comments `(60xx,3000|4000)` — are handled as ranges,
 and private (odd-group) tags are always removed.
 
-Date shifting is applied **only** with `[profile] retain_longitudinal_temporal =
-true`; otherwise each date/time attribute takes its E.1-1 action (`Z`, `D`, or
-`X`).
+Date shifting is applied with `[profile] retain_longitudinal_temporal = true`
+(the E.1-1 *Retain Longitudinal Temporal Information — Modified Dates* option:
+dates are shifted, times kept); `retain_longitudinal_full_dates = true` keeps
+dates verbatim. Otherwise each date/time attribute takes its E.1-1 action.
+
+### PS3.15 options
+
+All eleven E.1-1 option columns are implemented. Enabling an option sets the
+action from that column for every attribute the standard marks, overriding the
+Basic Profile action (options are resolved in table column order; later wins):
+
+| config flag | option |
+|---|---|
+| `retain_safe_private` | Retain Safe Private |
+| `retain_uids` | Retain UIDs |
+| `retain_device_identity` | Retain Device Identity |
+| `retain_institution_identity` | Retain Institution Identity |
+| `retain_patient_characteristics` | Retain Patient Characteristics |
+| `retain_longitudinal_full_dates` | Retain Longitudinal Temporal Information (Full Dates) |
+| `retain_longitudinal_temporal` | Retain Longitudinal Temporal Information (Modified Dates) |
+| `clean_descriptors` | Clean Descriptors |
+| `clean_structured_content` | Clean Structured Content |
+| `clean_graphics` | Clean Graphics |
+
+`C` (“clean”) in the standard is a content-aware operation; with no NLP this
+tool approximates it by neutralizing the value (and, for the *Modified Dates*
+option, by shifting dates). `clean_structured_content` / `clean_graphics` are
+accepted but only exercised on the attributes E.1-1 marks.
 
 ## Limits
 

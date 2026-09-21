@@ -2,10 +2,18 @@
 [profile]
 base = "ps3.15-basic"                # or "research"
 strategy = "aggressive"              # conservative | aggressive
-retain_longitudinal_temporal = false
-retain_safe_private = false
-clean_descriptors = false
-clean_structured_content = false
+
+# PS3.15 options (E.1-1 option columns). Each removes one restriction:
+retain_longitudinal_temporal = false # Modified Dates (shift dates)
+retain_longitudinal_full_dates = false # Full Dates (keep dates verbatim)
+retain_safe_private = false          # keep safe private attributes
+retain_uids = false                  # keep original UIDs
+retain_device_identity = false       # keep device identity
+retain_institution_identity = false  # keep institution identity
+retain_patient_characteristics = false # keep sex/age/size/weight
+clean_descriptors = false            # clean descriptor text
+clean_structured_content = false     # clean SR content
+clean_graphics = false               # clean graphics/annotation
 
 [dates]
 strategy = "shift"                   # shift | zero | remove

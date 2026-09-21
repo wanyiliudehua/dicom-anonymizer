@@ -155,6 +155,24 @@ pub struct Profile {
     pub clean_descriptors: bool,
     #[serde(default)]
     pub clean_structured_content: bool,
+    /// PS3.15 option: Retain UIDs.
+    #[serde(default)]
+    pub retain_uids: bool,
+    /// PS3.15 option: Retain Device Identity.
+    #[serde(default)]
+    pub retain_device_identity: bool,
+    /// PS3.15 option: Retain Institution Identity.
+    #[serde(default)]
+    pub retain_institution_identity: bool,
+    /// PS3.15 option: Retain Patient Characteristics.
+    #[serde(default)]
+    pub retain_patient_characteristics: bool,
+    /// PS3.15 option: Retain Longitudinal Temporal Information (Full Dates).
+    #[serde(default)]
+    pub retain_longitudinal_full_dates: bool,
+    /// PS3.15 option: Clean Graphics.
+    #[serde(default)]
+    pub clean_graphics: bool,
 }
 
 fn default_base() -> String {
@@ -170,6 +188,12 @@ impl Default for Profile {
             retain_safe_private: false,
             clean_descriptors: false,
             clean_structured_content: false,
+            retain_uids: false,
+            retain_device_identity: false,
+            retain_institution_identity: false,
+            retain_patient_characteristics: false,
+            retain_longitudinal_full_dates: false,
+            clean_graphics: false,
         }
     }
 }

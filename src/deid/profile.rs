@@ -6,7 +6,7 @@
 //! table does not carry and pins operationally-required tags.
 
 use crate::config::{parse_tag, Action, Config, Strategy};
-use crate::deid::e1_1::E11_BASE;
+use crate::deid::e1_1::E11;
 use crate::error::Result;
 use dicom_core::Tag;
 
@@ -49,19 +49,52 @@ const CONSERVATIVE_RETAIN: &[&str] = &[
     "0040,0251", // Performed Procedure Step End Time
 ];
 
-/// The base profile rules as `(tag, action)` pairs: full E.1-1 plus overrides.
-pub fn base_rules() -> Vec<(Tag, Action)> {
-    E11_BASE
-        .iter()
-        .chain(OVERRIDES.iter())
-        .map(|(t, a)| (parse_tag(t).expect("built-in tags are valid"), *a))
-        .collect()
+/// Whether a PS3.15 option (E.1-1 column key) is enabled in the config.
+fn option_enabled(cfg: &Config, key: &str) -> bool {
+    match key {
+        "rtn_safe_priv" => cfg.profile.retain_safe_private,
+        "rtn_uids" => cfg.profile.retain_uids,
+        "rtn_dev_id" => cfg.profile.retain_device_identity,
+        "rtn_inst_id" => cfg.profile.retain_institution_identity,
+        "rtn_pat_chars" => cfg.profile.retain_patient_characteristics,
+        "rtn_long_full_dates" => cfg.profile.retain_longitudinal_full_dates,
+        "rtn_long_modif_dates" => cfg.profile.retain_longitudinal_temporal,
+        "clean_desc" => cfg.profile.clean_descriptors,
+        "clean_struct" => cfg.profile.clean_structured_content,
+        "clean_graph" => cfg.profile.clean_graphics,
+        _ => false,
+    }
+}
+
+/// Resolve one attribute's action: the E.1-1 Basic action, overridden by every
+/// enabled option column (in the table's column order; later wins).
+fn resolve(basic: Action, opts: &[(&str, Action)], cfg: &Config) -> Action {
+    let mut action = basic;
+    for (key, value) in opts {
+        if option_enabled(cfg, key) {
+            action = *value;
+        }
+    }
+    action
+}
+
+/// The full E.1-1 table (with option resolution) plus the pinned overrides.
+pub fn base_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
+    use std::collections::BTreeMap;
+    let mut map: BTreeMap<Tag, Action> = BTreeMap::new();
+    for (tag, basic, opts) in E11 {
+        map.insert(parse_tag(tag)?, resolve(*basic, opts, cfg));
+    }
+    for (t, a) in OVERRIDES {
+        map.insert(parse_tag(t)?, *a);
+    }
+    Ok(map.into_iter().collect())
 }
 
 /// Base rules with the strategy overlay and user `[tags]` overrides applied.
 pub fn effective_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
     use std::collections::BTreeMap;
-    let mut map: BTreeMap<Tag, Action> = base_rules().into_iter().collect();
+    let mut map: BTreeMap<Tag, Action> = base_rules(cfg)?.into_iter().collect();
     // Conservative: retain demographics and dates/times verbatim.
     if cfg.profile.strategy == Strategy::Conservative {
         for t in CONSERVATIVE_RETAIN {
@@ -87,9 +120,9 @@ mod tests {
     #[test]
     fn e1_1_table_is_ported_and_has_anchors() {
         assert!(
-            E11_BASE.len() >= 600,
+            E11.len() >= 600,
             "E.1-1 table looks truncated: {} rows",
-            E11_BASE.len()
+            E11.len()
         );
         let m = rule_map(&Config::default());
         use crate::config::parse_tag;
@@ -225,5 +258,26 @@ mod tests {
         assert_ne!(m[&parse_tag("0010,1010").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0020").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0032").unwrap()], Action::K);
+    }
+
+    #[test]
+    fn options_override_basic_actions() {
+        use crate::config::parse_tag;
+        // (flag, tag, basic action, action with the option enabled)
+        let cases = [
+            ("retain_institution_identity", "0008,0080", Action::Z, Action::K),
+            ("retain_uids", "0020,000D", Action::U, Action::K),
+            ("retain_device_identity", "0018,1000", Action::Z, Action::K),
+            ("retain_patient_characteristics", "0010,0040", Action::Z, Action::K),
+            ("retain_longitudinal_full_dates", "0008,0020", Action::Z, Action::K),
+            ("retain_longitudinal_temporal", "0008,0020", Action::Z, Action::C),
+            ("clean_descriptors", "0008,1030", Action::X, Action::C),
+        ];
+        for (flag, tag, basic, with_option) in cases {
+            let t = parse_tag(tag).unwrap();
+            assert_eq!(rule_map(&Config::default())[&t], basic, "basic for {tag}");
+            let cfg = Config::from_toml_str(&format!("[profile]\n{flag} = true\n")).unwrap();
+            assert_eq!(rule_map(&cfg)[&t], with_option, "{flag} on {tag}");
+        }
     }
 }
