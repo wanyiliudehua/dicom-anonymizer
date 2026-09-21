@@ -83,6 +83,10 @@ separately — and `--verify` will tell you whether it still carries identifiers
 `--check-leaks` is the narrower, in-run check: it inspects only the DICOM files the run
 just wrote. Use `--verify` for a full audit of a tree.
 
+A clean tree is not necessarily a finished one, so `--verify --require-complete` also
+demands a `run.json` describing a complete run. A tree that is clean but unfinished then
+fails, which is what an acceptance step or a CI check actually wants to assert.
+
 See `dicom-anonymizer.example.toml` for all options.
 
 ## Output

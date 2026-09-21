@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--require-complete`: with `--verify`, also require `run.json` to describe a complete run.
+  A tree that is clean but unfinished then fails, so an acceptance step can assert
+  "verified **and** complete" rather than just "nothing matched". Used without `--verify`
+  it is a usage error (exit 2).
 - `[output] non_dicom = "skip" | "error"`. Sidecars (the sample dataset ships a CloudPACS
   XML) were dropped from the output tree with only a `skipped` line; `"error"` records a
   per-file error instead, so a run that drops a file cannot report success and `run.json`
@@ -56,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--verify` scanned rendered pixel data as text, making it ~400x slower than needed.**
+  `to_str()` stringifies any primitive, so every file contributed ~871 KB of decimal-rendered
+  pixel data to windowed hashing: about 6 s per file, and ~400 s for the 69-file sample tree,
+  which looks exactly like a hang. Scanning is now gated on the VR, so only text values are
+  read; the same tree verifies in 1 s with identical results.
 - **`--verify` only looked at DICOM files, and so gave false all-clears.** Real exports
   ship a sidecar XML (CloudPACS writes one) that repeats every attribute; on the sample
   dataset that file contains all 19 identifiers, and verifying a tree holding only it

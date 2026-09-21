@@ -24,7 +24,11 @@ fn run() -> i32 {
     // Verification is a separate, config-free mode: a fingerprint already records
     // what was identifying when it was exported.
     if let Some(path) = args.verify.clone() {
-        return run_verify(&args.input, &path);
+        return run_verify(&args.input, &path, args.require_complete);
+    }
+    if args.require_complete {
+        eprintln!("error: --require-complete only applies to --verify");
+        return 2;
     }
 
     let Some(output) = args.output.clone() else {
@@ -278,7 +282,7 @@ fn export_fingerprint(
 }
 
 /// Scan `input` against a fingerprint and report anything that survived.
-fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
+fn run_verify(input: &std::path::Path, path: &std::path::Path, require_complete: bool) -> i32 {
     if !input.is_dir() {
         eprintln!("error: input `{}` is not a directory", input.display());
         return 2;
@@ -297,17 +301,44 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
             return 2;
         }
     };
-    // A tree nobody here produced may have no marker; that is worth saying, not failing.
+    // A tree nobody here produced may have no marker. Without --require-complete that is
+    // worth saying but not worth failing; with it, an unfinished tree is exactly what the
+    // caller asked to be told about, and being clean is not the same as being complete.
+    let mut tree_ok = true;
     match report::Manifest::load(input) {
-        Ok(Some(m)) => eprintln!(
-            "manifest: outcome={:?} total={} ok={} skipped={} unsupported={} error={} audit_complete={}",
-            m.outcome, m.total, m.ok, m.skipped, m.unsupported, m.error, m.audit_complete
-        ),
-        Ok(None) => eprintln!(
-            "manifest: none (no {}) - the tree may be incomplete or produced elsewhere",
-            report::MANIFEST_FILE
-        ),
-        Err(e) => eprintln!("manifest: unreadable: {e}"),
+        Ok(Some(m)) => {
+            eprintln!(
+                "manifest: outcome={:?} total={} ok={} skipped={} unsupported={} error={} audit_complete={}",
+                m.outcome, m.total, m.ok, m.skipped, m.unsupported, m.error, m.audit_complete
+            );
+            if require_complete && (m.outcome != report::Outcome::Complete || !m.audit_complete) {
+                tree_ok = false;
+                eprintln!(
+                    "error: --require-complete, but this is not a complete run \
+                     (outcome={:?}, audit_complete={})",
+                    m.outcome, m.audit_complete
+                );
+            }
+        }
+        Ok(None) => {
+            eprintln!(
+                "manifest: none (no {}) - the tree may be incomplete or produced elsewhere",
+                report::MANIFEST_FILE
+            );
+            if require_complete {
+                tree_ok = false;
+                eprintln!(
+                    "error: --require-complete, but the tree carries no {}",
+                    report::MANIFEST_FILE
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("manifest: unreadable: {e}");
+            if require_complete {
+                tree_ok = false;
+            }
+        }
     }
 
     let hits = match verify::scan_fingerprint(input, &fp) {
@@ -341,7 +372,7 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
         fp.hashes.len(),
         input.display()
     );
-    if hits.is_empty() {
+    if tree_ok && hits.is_empty() {
         0
     } else {
         1

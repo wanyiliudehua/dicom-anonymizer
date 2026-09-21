@@ -41,6 +41,10 @@ pub struct Args {
     /// instead of anonymizing; exits 1 if anything survived.
     #[arg(long, value_name = "FILE")]
     pub verify: Option<PathBuf>,
+    /// With `--verify`, also require the tree to carry a `run.json` describing a
+    /// complete run; a tree that is clean but unfinished then fails.
+    #[arg(long, default_value_t = false)]
+    pub require_complete: bool,
     /// Stop at the first per-file error.
     #[arg(long, default_value_t = false)]
     pub fail_fast: bool,
@@ -61,6 +65,16 @@ mod tests {
         assert_eq!(a.input.to_string_lossy(), "in");
         assert_eq!(a.output.as_deref().unwrap().to_string_lossy(), "out");
         assert!(!a.dry_run);
+    }
+
+    #[test]
+    fn require_complete_is_opt_in() {
+        let a = Args::try_parse_from(["x", "-i", "in", "--verify", "fp.json"]).unwrap();
+        assert!(!a.require_complete);
+        let b =
+            Args::try_parse_from(["x", "-i", "in", "--verify", "fp.json", "--require-complete"])
+                .unwrap();
+        assert!(b.require_complete);
     }
 
     #[test]

@@ -149,6 +149,10 @@ dicom-anonymizer \
   every attribute beside the images, and a DICOM-only scan called such a tree clean.
 - `--output` is therefore optional at the clap level and validated manually: required in
   the default (anonymise) mode, unused by `--verify`.
+- `--require-complete`: with `--verify`, also require `run.json` to describe a complete
+  run (`outcome = complete` and `audit_complete`); a clean-but-unfinished tree then fails,
+  which is the assertion an acceptance step actually wants. Used without `--verify` it is a
+  usage error (exit 2).
 
 ## 7. Configuration
 
@@ -402,7 +406,8 @@ finished product. The marker written at the end of a run is what separates them:
 - Audit-write failures are surfaced and make the run exit `1`.
 - A `--check-leaks` hit is reported on stderr and makes the run exit `1`.
 - `--verify` exits `0` when nothing matched and `1` when any identifier survived; bad
-  arguments or an unreadable/invalid fingerprint file exit `2`.
+  arguments or an unreadable/invalid fingerprint file exit `2`. With `--require-complete`,
+  a missing or non-complete marker also exits `1` (the tree is not what was asked for).
 - Exit codes: `0` all files succeeded/skipped; `1` ≥1 error, audit-write failure, or
   leak/verify hit; `2` fatal (bad args, unreadable config, missing input directory).
 - A final summary is printed to stderr.
@@ -525,6 +530,8 @@ dicom-anonymizer/
    clean run, and exits `1` naming file/tag/identifier when an identifier survives.
 9. A finished run leaves `<out>/run.json` with `outcome = complete`; a run that leaves a
    file un-anonymised records `partial`; `--dry-run` writes no marker.
+10. `--verify --require-complete` rejects a tree with no marker and a tree whose marker
+    says `partial`, and accepts a finished one.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -587,6 +594,13 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   files line by line and reports a windowed snippet, so one hit inside a 90 KB single-line
   XML is actionable rather than a flood. This also made `--verify` strictly stronger than
   `--check-leaks`, which still inspects only the DICOM files a run wrote.
+- **`--require-complete`** was added beyond the plan so the completion marker can be
+  asserted rather than merely reported: a clean tree and a finished tree are different
+  claims, and automated acceptance needs the second one.
+- **`--verify` was about 400x slower than it needed to be.** Measured on the sample tree:
+  ~6 s per file, ~400 s per batch. `to_str()` stringifies any primitive, so the walk fed
+  ~871 KB of rendered pixel data per image into windowed hashing. Scanning is now gated on
+  the VR (`is_text_vr`), which took the same 69-file tree to 1 s with identical results.
 - **`[limits] max_input_bytes`** was added beyond the plan after the memory profile was
   written down: nothing stopped a single huge input from exhausting the machine and
   getting the process killed mid-batch. It is a per-file guard checked before the file is

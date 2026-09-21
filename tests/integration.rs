@@ -792,6 +792,120 @@ fn non_dicom_error_mode_fails_instead_of_dropping_the_file() {
 }
 
 #[test]
+fn require_complete_accepts_a_finished_run() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(out.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .arg("--require-complete")
+        .assert()
+        .success();
+}
+
+#[test]
+fn require_complete_rejects_a_tree_without_a_marker() {
+    let src = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let fp = dir.path().join("ids.json");
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(dir.path().join("out"))
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+
+    // A tree that carries no marker, e.g. one produced by another tool.
+    let tree = tempfile::tempdir().unwrap();
+    std::fs::write(tree.path().join("notes.txt"), "nothing identifying").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(tree.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .arg("--require-complete")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no run.json"));
+}
+
+#[test]
+fn require_complete_rejects_a_partial_run() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("good.dcm"), "Doe^John", "1.2.3");
+    common::write_broken_dicom(&src.path().join("bad.dcm"));
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .failure();
+
+    // The tree is clean but not complete, and that distinction is the point.
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(out.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .arg("--require-complete")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not a complete run"));
+}
+
+#[test]
+fn require_complete_without_verify_is_an_argument_error() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .arg("--require-complete")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("only applies to --verify"));
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();
