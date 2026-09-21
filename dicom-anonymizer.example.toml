@@ -1,0 +1,37 @@
+# Example configuration. Values shown are the defaults unless noted.
+[profile]
+base = "ps3.15-basic"                # or "research"
+retain_longitudinal_temporal = false
+retain_safe_private = false
+clean_descriptors = false
+clean_structured_content = false
+
+[dates]
+strategy = "shift"                   # shift | zero | remove
+shift_salt = ""                      # empty => random per run (set for reproducibility)
+range_days = 3650
+
+[uids]
+strategy = "remap"                   # remap | zero
+root = "2.25."
+salt = ""                            # empty => random per run
+
+[pixels]
+mode = "mask"                        # mask | keep
+fill = 0                             # 0 | 255 | "max"
+on_missing_burnedin = "warn"         # warn | skip | mask_all
+
+# [[pixels.regions]]
+# modality = "US"
+# shape = "rect"
+# x = 0
+# y = 0
+# width = 200
+# height = 30
+# frames = "all"
+
+# [tags]
+# "0010,0010" = "Z"
+
+# [dummies]
+# "0008,0070" = "ANON"
