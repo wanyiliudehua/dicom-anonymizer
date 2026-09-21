@@ -146,6 +146,104 @@ fn leak_check_is_skipped_in_dry_run() {
 }
 
 #[test]
+fn series_layout_groups_outputs_by_series() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    for (rel, name, sop) in [
+        ("a/one.dcm", "Doe^John", "1.2.3.1"),
+        ("b/two.dcm", "Roe^Jane", "1.2.3.2"),
+    ] {
+        common::write_fixture_extra(
+            &src.path().join(rel),
+            name,
+            sop,
+            &[(
+                dicom_dictionary_std::tags::SERIES_INSTANCE_UID,
+                VR::UI,
+                "1.2.840.9",
+            )],
+        );
+    }
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(
+        &cfg_path,
+        "[output]\nfilename = \"preserve\"\nlayout = \"series\"\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+
+    // Both files share a series, so they land flattened in one directory.
+    let dirs: Vec<_> = std::fs::read_dir(out.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect();
+    assert_eq!(dirs.len(), 1, "expected exactly one series directory");
+    let series_dir = dirs[0].path();
+    assert!(series_dir.join("one.dcm").exists());
+    assert!(series_dir.join("two.dcm").exists());
+    // the input directory structure is not mirrored
+    assert!(!out.path().join("a").exists());
+    assert!(!out.path().join("b").exists());
+
+    // and the directory is named after the *new* (remapped) series UID
+    let o = dicom_object::open_file(series_dir.join("one.dcm")).unwrap();
+    let series = o
+        .element(dicom_dictionary_std::tags::SERIES_INSTANCE_UID)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(series, "1.2.840.9", "series UID must be remapped");
+    assert_eq!(
+        series_dir.file_name().unwrap().to_string_lossy(),
+        series,
+        "the directory name must be the remapped series UID"
+    );
+}
+
+#[test]
+fn series_layout_falls_back_to_mirror_without_a_series_uid() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("a/one.dcm"), "Doe^John", "1.2.3");
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(
+        &cfg_path,
+        "[output]\nfilename = \"preserve\"\nlayout = \"series\"\n[uids]\nstrategy = \"zero\"\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+
+    // With no series UID to group by, the mirrored path is kept (no data loss).
+    assert!(out.path().join("a/one.dcm").exists());
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

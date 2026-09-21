@@ -147,6 +147,7 @@ fn scrub(text: &str, ids: &[String]) -> String {
         return text.to_string();
     }
     let mut out = text.to_string();
+    let mut removed = false;
     for id in ids {
         let needle = id.to_ascii_lowercase();
         if needle.is_empty() {
@@ -155,10 +156,18 @@ fn scrub(text: &str, ids: &[String]) -> String {
         loop {
             let lower = out.to_ascii_lowercase();
             match lower.find(&needle) {
-                Some(pos) => out.replace_range(pos..pos + needle.len(), ""),
+                Some(pos) => {
+                    out.replace_range(pos..pos + needle.len(), "");
+                    removed = true;
+                }
                 None => break,
             }
         }
+    }
+    if !removed {
+        // Nothing matched, so `out` is still the original: hand it back untouched
+        // rather than normalizing whitespace we were not asked to touch.
+        return out;
     }
     out.split_whitespace()
         .collect::<Vec<_>>()
@@ -615,6 +624,29 @@ mod tests {
         assert_eq!(
             crate::deid::dataset::get_string(&o, Tag(0x0008, 0x103E)).as_deref(),
             Some("localizer")
+        );
+    }
+
+    #[test]
+    fn clean_leaves_unmatched_text_byte_for_byte() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        // No identifier occurs here, so the value must survive exactly as-is:
+        // cleaning is not a licence to rewrite text it did not need to touch.
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x1030),
+            VR::LO,
+            "l-spine  T2  w",
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("l-spine  T2  w")
         );
     }
 }

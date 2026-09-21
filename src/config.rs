@@ -75,16 +75,29 @@ pub enum FilenameMode {
     Preserve,
 }
 
+/// How output files are placed under the output root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Layout {
+    /// Mirror the input tree's relative paths (default).
+    #[default]
+    Mirror,
+    /// Flatten every file into a directory named after its (remapped) series UID.
+    Series,
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default)]
 pub struct Output {
     pub filename: FilenameMode,
+    pub layout: Layout,
 }
 
 impl Default for Output {
     fn default() -> Self {
         Output {
             filename: FilenameMode::SopInstanceUid,
+            layout: Layout::Mirror,
         }
     }
 }
@@ -476,6 +489,18 @@ mod tests {
         assert_eq!(c.output.filename, FilenameMode::SopInstanceUid);
         let c2 = Config::from_toml_str("[output]\nfilename = \"preserve\"\n").unwrap();
         assert_eq!(c2.output.filename, FilenameMode::Preserve);
+    }
+
+    #[test]
+    fn output_layout_defaults_to_mirror_and_can_group_by_series() {
+        let c = Config::from_toml_str("").unwrap();
+        assert_eq!(c.output.layout, Layout::Mirror);
+        // `filename` still parses when `layout` is absent, and vice versa.
+        let c2 = Config::from_toml_str("[output]\nfilename = \"preserve\"\n").unwrap();
+        assert_eq!(c2.output.layout, Layout::Mirror);
+        let c3 = Config::from_toml_str("[output]\nlayout = \"series\"\n").unwrap();
+        assert_eq!(c3.output.layout, Layout::Series);
+        assert_eq!(c3.output.filename, FilenameMode::SopInstanceUid);
     }
 
     #[test]

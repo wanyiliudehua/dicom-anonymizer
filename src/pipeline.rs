@@ -1,7 +1,7 @@
 //! Per-file pipeline: parse, de-identify tags, mask pixels, write, audit.
 
 use crate::audit::{self, Record, Status};
-use crate::config::{Config, FilenameMode};
+use crate::config::{Config, FilenameMode, Layout};
 use crate::deid::actions::{apply, DeidContext};
 use crate::deid::dataset as ds;
 use crate::deid::dates::DateShifter;
@@ -47,6 +47,22 @@ fn temp_path(target: &Path) -> PathBuf {
             .map(|e| format!("{e}."))
             .unwrap_or_default()
     ))
+}
+
+/// The series UID becomes a directory name, so keep it to UID-safe characters.
+/// A malformed file cannot then steer writes outside the output root: separators
+/// are dropped, and a name that does not start alphanumerically (`.`, `..`, a
+/// hidden or absolute path) is refused and the caller falls back to mirroring.
+fn series_dir_name(uid: &str) -> Option<String> {
+    let cleaned: String = uid
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .collect();
+    let starts_ok = cleaned
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphanumeric());
+    starts_ok.then_some(cleaned)
 }
 
 fn emit(log: &mut impl Write, rec: &Record) {
@@ -133,13 +149,34 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     };
 
-    let out_rel = match shared.cfg.output.filename {
+    let base_rel = match shared.cfg.output.filename {
         FilenameMode::Preserve => job.rel.clone(),
         FilenameMode::SopInstanceUid => {
             let new_sop = ds::get_string(&obj, dicom_dictionary_std::tags::SOP_INSTANCE_UID);
             match new_sop.filter(|s| !s.is_empty()) {
                 Some(uid) => job.rel.with_file_name(format!("{uid}.dcm")),
                 None => job.rel.clone(),
+            }
+        }
+    };
+
+    let out_rel = match shared.cfg.output.layout {
+        Layout::Mirror => base_rel,
+        // Group by the *new* (remapped) series UID, so directory names do not
+        // leak the original, and fall back to mirroring when there is none.
+        Layout::Series => {
+            match ds::get_string(&obj, dicom_dictionary_std::tags::SERIES_INSTANCE_UID)
+                .as_deref()
+                .and_then(series_dir_name)
+            {
+                Some(series) => {
+                    let name = base_rel
+                        .file_name()
+                        .map(|n| n.to_os_string())
+                        .unwrap_or_else(|| base_rel.clone().into_os_string());
+                    Path::new(&series).join(name)
+                }
+                None => base_rel,
             }
         }
     };
@@ -253,6 +290,18 @@ mod tests {
             .ok()
             .and_then(|e| e.to_str().ok().map(|s| s.to_string()));
         assert_ne!(name.as_deref(), Some("Doe^John"));
+    }
+
+    #[test]
+    fn series_dir_name_refuses_to_escape_the_output_root() {
+        assert_eq!(series_dir_name("1.2.840.9"), Some("1.2.840.9".to_string()));
+        assert_eq!(series_dir_name(""), None);
+        assert_eq!(series_dir_name(".."), None);
+        assert_eq!(series_dir_name("../../etc"), None);
+        assert_eq!(series_dir_name(".hidden"), None);
+        // separators are dropped rather than followed
+        assert_eq!(series_dir_name("a/b"), Some("ab".to_string()));
+        assert_eq!(series_dir_name("/abs"), Some("abs".to_string()));
     }
 
     #[test]

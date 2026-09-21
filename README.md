@@ -53,7 +53,17 @@ See `dicom-anonymizer.example.toml` for all options.
 The output tree mirrors the input tree. By default, each output file is renamed
 to its **remapped SOP Instance UID** (`[output] filename = "sop_instance_uid"`),
 so the original instance UID cannot leak through the filename; set
-`filename = "preserve"` to keep the original relative filenames. `audit.jsonl` in
+`filename = "preserve"` to keep the original relative filenames.
+
+Set `[output] layout = "series"` to flatten the tree instead: every file goes into a
+directory named after its **remapped** Series Instance UID, which is usually what a
+viewer or analysis pipeline wants. Directory names are the new UIDs, so no original
+identifier leaks through the path, and a file with no series UID (or one that is not
+safe to use as a directory name) falls back to the mirrored path rather than being
+dropped. Note that with `layout = "series"` and `filename = "preserve"`, two files in
+one series that share a file name would collide; prefer the default UID naming there.
+
+`audit.jsonl` in
 the output directory has one JSON object per file (status, changed tag count,
 `regions_masked` and `samples_masked`, transfer syntaxes, output SHA-256).
 Non-DICOM files are logged with `status: skipped`; a file whose transfer syntax

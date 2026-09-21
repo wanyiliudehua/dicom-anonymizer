@@ -301,6 +301,10 @@ Returns a `PixelReport { regions_masked, samples_masked }`.
 - The output directory mirrors the input tree. By default each file is renamed to
   `<new SOP Instance UID>.dcm`; `[output] filename = "preserve"` keeps the original
   relative name.
+- `[output] layout = "series"` flattens instead: `<out>/<new series UID>/<name>`. The
+  directory name is sanitized for path safety (separators dropped; a name that does not
+  start alphanumerically is refused), and a file with no usable series UID keeps the
+  mirrored path rather than being dropped.
 - The whole DICOM file is written via `write_to_file` to a sibling temp path, then
   renamed over the target (atomic; preserves preamble + file meta).
 
@@ -470,6 +474,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   drives `C` is reused to verify the result, which required grouping harvested
   identifiers by category (`Identifiers { patient, names, orgs }`) so that categories
   the user retained are not reported as leaks.
+- **`[output] layout = "series"`** was added beyond the plan, grouping outputs by the
+  *remapped* series UID; the series UID is sanitized before being used as a directory
+  name so a malformed file cannot steer writes outside the output root.
+- **`C` no longer normalizes whitespace when nothing matched.** The clean action now
+  returns the value byte-for-byte unless it actually removed an identifier, matching the
+  documented "no identifier present → unchanged" behaviour.
 - **Toolchain shim** added for this host (see §18).
 - **`chrono`, `dicom-core`, `dicom-encoding`, `dicom-dictionary-std`** were added as
   direct dependencies; `hex` and `dicom-transfer-syntax-registry`'s `deflate` feature
