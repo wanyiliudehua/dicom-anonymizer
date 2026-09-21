@@ -37,6 +37,7 @@ non_dicom = "skip"                   # skip | error (copying is deliberately not
 
 [limits]
 max_input_bytes = 2147483648         # refuse larger inputs (0 = no limit)
+max_parallel_bytes = 1073741824      # cap jobs x largest input (0 = no cap)
 
 # [[pixels.regions]]
 # modality = "US"

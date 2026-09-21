@@ -324,6 +324,9 @@ pub struct Limits {
     /// file size (the object, the transcoded pixels and the serialised output all live
     /// at once) multiplied by the number of jobs in flight.
     pub max_input_bytes: u64,
+    /// Maximimum bytes of input allowed in flight at once. The job count is reduced so that
+    /// `jobs x largest_input` stays within this. `0` disables the cap.
+    pub max_parallel_bytes: u64,
 }
 
 impl Default for Limits {
@@ -333,7 +336,24 @@ impl Default for Limits {
         // refusing one file loudly.
         Limits {
             max_input_bytes: 2 * 1024 * 1024 * 1024,
+            max_parallel_bytes: 1024 * 1024 * 1024,
         }
+    }
+}
+
+impl Limits {
+    /// How many files may be in flight at once.
+    ///
+    /// Every file is held whole, so the peak scales with `jobs x largest input`. Capping
+    /// the job count from the largest input we know about bounds that statically and
+    /// predictably, unlike a runtime byte budget which would have to block workers.
+    pub fn parallel_jobs(&self, requested: usize, largest: u64) -> usize {
+        let requested = requested.max(1);
+        if self.max_parallel_bytes == 0 || largest == 0 {
+            return requested;
+        }
+        let by_budget = (self.max_parallel_bytes / largest).max(1);
+        requested.min(by_budget.min(usize::MAX as u64) as usize)
     }
 }
 
@@ -538,6 +558,26 @@ mod tests {
     }
 
     #[test]
+    fn parallel_jobs_is_capped_by_the_largest_input() {
+        let mut l = Limits {
+            max_input_bytes: 0,
+            max_parallel_bytes: 1024,
+        };
+        assert_eq!(l.parallel_jobs(8, 256), 4);
+        assert_eq!(l.parallel_jobs(2, 256), 2, "never more than asked for");
+        assert_eq!(
+            l.parallel_jobs(8, 4096),
+            1,
+            "a file larger than the whole budget runs alone"
+        );
+        assert_eq!(l.parallel_jobs(8, 0), 8, "an unknown size does not cap");
+        assert_eq!(l.parallel_jobs(0, 128), 1, "at least one job");
+
+        l.max_parallel_bytes = 0;
+        assert_eq!(l.parallel_jobs(8, 4096), 8, "0 disables the cap");
+    }
+
+    #[test]
     fn size_limit_defaults_to_two_gib_and_parses() {
         let c = Config::from_toml_str("").unwrap();
         assert_eq!(c.limits.max_input_bytes, 2 * 1024 * 1024 * 1024);
@@ -545,6 +585,13 @@ mod tests {
         assert_eq!(c2.limits.max_input_bytes, 1024);
         let c3 = Config::from_toml_str("[limits]\nmax_input_bytes = 0\n").unwrap();
         assert_eq!(c3.limits.max_input_bytes, 0, "0 means unlimited");
+        assert_eq!(
+            c.limits.max_parallel_bytes,
+            1024 * 1024 * 1024,
+            "parallel budget defaults to 1 GiB"
+        );
+        let c4 = Config::from_toml_str("[limits]\nmax_parallel_bytes = 0\n").unwrap();
+        assert_eq!(c4.limits.max_parallel_bytes, 0);
     }
 
     #[test]

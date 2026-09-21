@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `[limits] max_parallel_bytes` (default 1 GiB, `0` disables): the job count is reduced so
+  that `jobs × largest input` stays inside it, bounding peak memory from the side
+  `max_input_bytes` cannot reach — many ordinary files in flight at once. The largest input
+  comes from discovery, so the decision is static and cannot block or deadlock, and the run
+  prints a note when the cap applies. On the sample tree the default never bites (16 jobs,
+  largest file 902 KiB); a 2 MiB budget reduces 16 jobs to 2.
 - `--verify` now reports its **coverage**: files searched, text values and bytes examined,
   and how many non-text values were deliberately not searched. Only text VRs are searched,
   so "0 hits" is a bounded claim instead of a blanket all-clear — on the sample tree it

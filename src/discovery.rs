@@ -11,6 +11,8 @@ pub struct Job {
     pub rel: PathBuf,
     /// Whether the file is DICOM (`DICM` magic at offset 128).
     pub dicom: bool,
+    /// Size in bytes, used to bound how many files may be in flight at once.
+    pub size: u64,
 }
 
 /// A file is DICOM when bytes 128..132 are the `DICM` magic.
@@ -43,6 +45,7 @@ pub fn discover(input: &Path) -> Result<Vec<Job>> {
             input: path.to_path_buf(),
             rel,
             dicom: is_dicom_file(path),
+            size: entry.metadata().map(|m| m.len()).unwrap_or(0),
         });
     }
     jobs.sort_by(|a, b| a.rel.cmp(&b.rel));

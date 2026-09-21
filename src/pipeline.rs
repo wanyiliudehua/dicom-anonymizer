@@ -307,6 +307,7 @@ mod tests {
             input: inpath.clone(),
             rel: "p.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -351,6 +352,7 @@ mod tests {
             input: inpath,
             rel: "p.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -398,6 +400,7 @@ mod tests {
             input: inpath,
             rel: "sub/orig-name.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -443,6 +446,7 @@ mod tests {
             input: inpath,
             rel: "p.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -476,6 +480,7 @@ mod tests {
             input: inpath,
             rel: "sub/orig-name.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -540,6 +545,7 @@ mod tests {
             input: inpath,
             rel: "p.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
@@ -594,6 +600,7 @@ mod tests {
             input: inpath,
             rel: "p.dcm".into(),
             dicom: true,
+            size: 0,
         };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();

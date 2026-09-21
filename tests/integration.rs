@@ -971,6 +971,32 @@ fn verify_reports_the_scope_of_its_search() {
 }
 
 #[test]
+fn parallelism_is_capped_so_input_in_flight_stays_bounded() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[limits]\nmax_parallel_bytes = 1\n").unwrap();
+
+    // A one-byte budget cannot hold even one file, so the job count must come down to 1
+    // rather than the requested 4, and the run must say so.
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .args(["--jobs", "4"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("instead of 4"));
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

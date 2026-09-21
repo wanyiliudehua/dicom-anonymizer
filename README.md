@@ -222,10 +222,18 @@ With the default random salts, results are not reproducible across runs; set
 `dates.shift_salt` and `uids.salt` for reproducibility.
 
 Very large single files are refused rather than attempted. `[limits] max_input_bytes`
-(default 2 GiB, `0` disables) turns any larger input into a per-file `error` *before it
-is read*: peak memory is a multiple of the file size times the number of jobs in flight,
-and being killed part-way through a batch leaves a partial tree. Use `--jobs 1` to bound
-the multiplier, or raise the limit if you really mean to process something enormous.
+(default 2 GiB, `0` disables) turns any larger input into a per-file `error` *before it is
+read*, because being killed part-way through a batch leaves a partial tree.
+
+The number of jobs is also capped so that `jobs × largest input` stays inside
+`[limits] max_parallel_bytes` (default 1 GiB, `0` disables). The largest input is known
+from discovery, so this is a static decision rather than workers blocking on a runtime
+budget. When it bites the run says so:
+
+```
+note: using 2 job(s) instead of 16, so at most 2.0 MiB of input is in flight
+      (largest file 902 KiB); raise [limits] max_parallel_bytes to change
+```
 
 A source file that carries non-ASCII text while declaring **no** `SpecificCharacterSet`
 is not conformant, but it is handled rather than rejected: the bytes are decoded

@@ -95,6 +95,28 @@ fn run() -> i32 {
         }
     };
 
+    // Every file is held whole, so bound how many can be in flight at once. The largest
+    // input is known up front, so this needs neither a runtime byte budget nor workers
+    // blocking on one.
+    let largest_input = jobs.iter().map(|j| j.size).max().unwrap_or(0);
+    let requested_jobs = args.jobs.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+    });
+    let effective_jobs = shared
+        .cfg
+        .limits
+        .parallel_jobs(requested_jobs, largest_input);
+    if effective_jobs < requested_jobs {
+        eprintln!(
+            "note: using {effective_jobs} job(s) instead of {requested_jobs}, so at most {} \
+             of input is in flight (largest file {}); raise [limits] max_parallel_bytes to change",
+            report::fmt_bytes(shared.cfg.limits.max_parallel_bytes),
+            report::fmt_bytes(largest_input)
+        );
+    }
+
     // Optional: record what was identifying, as salted hashes, so this run can be
     // re-verified later without the originals and without storing PHI again.
     if let Some(path) = &args.export_identifiers {
@@ -157,11 +179,10 @@ fn run() -> i32 {
         }
     } else {
         use rayon::prelude::*;
-        if let Some(n) = args.jobs {
-            let _ = rayon::ThreadPoolBuilder::new()
-                .num_threads(n)
-                .build_global();
-        }
+        // Built even when --jobs was not given, so the byte cap still applies.
+        let _ = rayon::ThreadPoolBuilder::new()
+            .num_threads(effective_jobs)
+            .build_global();
         // `Shared` is immutable, and UID/date mapping are pure functions, so
         // file processing parallelizes without any shared mutable state.
         let results: Vec<(report::Summary, Vec<u8>)> = jobs

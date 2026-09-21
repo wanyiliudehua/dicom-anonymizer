@@ -192,10 +192,7 @@ non_dicom = "skip"                     # skip | error (copying is deliberately n
 
 [limits]
 max_input_bytes = 2147483648           # refuse larger inputs (0 = no limit)
-layout = "mirror"                     # mirror | series (one dir per remapped series UID)
-
-[limits]
-max_input_bytes = 2147483648           # refuse larger inputs (0 = no limit)
+max_parallel_bytes = 1073741824        # cap jobs x largest input (0 = no cap)
 
 [dummies]
 # optional overrides for the D action; unspecified tags use built-in defaults
@@ -429,6 +426,12 @@ even though completions arrive out of order, and each line is written with a sin
 observed: on the sample dataset the whole batch finishes inside one interval, so only the
 final line is ever emitted there.
 
+The job count is reduced when `jobs x largest input` would exceed
+`[limits] max_parallel_bytes`, since every file is held whole. The largest input is known
+from discovery, so the cap is a static decision taken before any worker starts, rather than
+a runtime byte budget that would have to block workers and could deadlock. The run prints
+a note when the cap applies.
+
 ## 15. Testing
 
 Current suite: **80 unit + 4 integration tests**.
@@ -546,6 +549,8 @@ dicom-anonymizer/
     stderr redirected, nothing extra is printed.
 12. `--verify` reports coverage: files searched, text values and bytes examined, and how
     many non-text values were deliberately not searched.
+13. The job count is reduced so that `jobs x largest input` stays within
+    `[limits] max_parallel_bytes`, and the run says so when that happens.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -622,6 +627,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   ~6 s per file, ~400 s per batch. `to_str()` stringifies any primitive, so the walk fed
   ~871 KB of rendered pixel data per image into windowed hashing. Scanning is now gated on
   the VR (`is_text_vr`), which took the same 69-file tree to 1 s with identical results.
+- **`[limits] max_parallel_bytes`** was added beyond the plan to bound peak memory from
+  the other side: `max_input_bytes` refuses one oversized file, but N ordinary files in
+  flight multiply by the job count. The cap is computed from the largest input found during
+  discovery, so it is static and cannot block or deadlock, and the run reports when it
+  applies. Measured on the sample tree: the 1 GiB default never bites (16 jobs, largest file
+  902 KiB), while a 2 MiB budget reduces 16 jobs to 2.
 - **`[limits] max_input_bytes`** was added beyond the plan after the memory profile was
   written down: nothing stopped a single huge input from exhausting the machine and
   getting the process killed mid-batch. It is a per-file guard checked before the file is

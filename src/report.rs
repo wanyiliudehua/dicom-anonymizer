@@ -180,6 +180,21 @@ impl Progress {
     }
 }
 
+/// Human-readable size: `874 B`, `514 KiB`, `1.5 MiB`, `2.00 GiB`.
+pub fn fmt_bytes(n: u64) -> String {
+    const K: f64 = 1024.0;
+    let f = n as f64;
+    if f < K {
+        format!("{n} B")
+    } else if f < K * K {
+        format!("{:.0} KiB", f / K)
+    } else if f < K * K * K {
+        format!("{:.1} MiB", f / (K * K))
+    } else {
+        format!("{:.2} GiB", f / (K * K * K))
+    }
+}
+
 /// Compact duration: `12s`, `3m05s`, `2h07m`.
 fn fmt_duration(d: Duration) -> String {
     let s = d.as_secs();
@@ -244,6 +259,16 @@ mod tests {
         assert_eq!(fmt_duration(Duration::from_secs(12)), "12s");
         assert_eq!(fmt_duration(Duration::from_secs(65)), "1m05s");
         assert_eq!(fmt_duration(Duration::from_secs(3600 + 420)), "1h07m");
+    }
+
+    #[test]
+    fn sizes_are_formatted_with_a_unit_that_does_not_round_to_zero() {
+        // Reporting a 526 KB file as "0 MiB" reads like an empty file.
+        assert_eq!(fmt_bytes(0), "0 B");
+        assert_eq!(fmt_bytes(874), "874 B");
+        assert_eq!(fmt_bytes(526_446), "514 KiB");
+        assert_eq!(fmt_bytes(1024 * 1024), "1.0 MiB");
+        assert_eq!(fmt_bytes(2 * 1024 * 1024 * 1024), "2.00 GiB");
     }
 
     #[test]
