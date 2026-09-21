@@ -18,7 +18,7 @@ clean_graphics = false               # clean graphics/annotation
 [dates]
 strategy = "shift"                   # shift | zero | remove
 shift_salt = ""                      # empty => random per run (set for reproducibility)
-range_days = 3650
+range_days = 3650                    # 0..=36500; bounds 2 * range_days + 1
 
 [uids]
 strategy = "remap"                   # remap | zero

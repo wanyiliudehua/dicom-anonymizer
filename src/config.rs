@@ -229,6 +229,13 @@ pub struct Dates {
     pub range_days: i64,
 }
 
+/// Upper bound for `[dates] range_days`.
+///
+/// `DateShifter::offset_for` computes `2 * range_days + 1`; without a bound an absurd
+/// value overflows (panic in debug, silent wrap in release) instead of being a config
+/// error. 36500 days is a century, which is already far beyond any real date range.
+pub const MAX_RANGE_DAYS: i64 = 36500;
+
 impl Default for Dates {
     fn default() -> Self {
         Dates {
@@ -465,6 +472,12 @@ impl Config {
                 self.uids.root
             )));
         }
+        if !(0..=MAX_RANGE_DAYS).contains(&self.dates.range_days) {
+            return Err(AnonError::Config(format!(
+                "invalid dates.range_days `{}` (expected 0..={MAX_RANGE_DAYS})",
+                self.dates.range_days
+            )));
+        }
         if let FillValue::Named(n) = &self.pixels.fill {
             if n != "max" {
                 return Err(AnonError::Config(format!("invalid pixels.fill `{n}`")));
@@ -544,6 +557,36 @@ mod tests {
     fn rejects_invalid_uid_root_when_remapping() {
         let c = Config::from_toml_str("[uids]\nstrategy = \"remap\"\nroot = \"abc\"\n").unwrap();
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_a_date_range_that_would_overflow() {
+        // offset_for computes `2 * range_days + 1`, so an absurd range used to panic
+        // mid-run in a debug build and wrap silently in release - aborting a batch over a
+        // config typo that should have been a clean exit 2.
+        let huge = Config::from_toml_str("[dates]\nrange_days = 9223372036854775807\n").unwrap();
+        assert!(huge.validate().is_err(), "i64::MAX must be rejected");
+        assert!(
+            Config::from_toml_str("[dates]\nrange_days = -5\n")
+                .unwrap()
+                .validate()
+                .is_err(),
+            "a negative range is meaningless"
+        );
+        assert!(
+            Config::from_toml_str("[dates]\nrange_days = 36500\n")
+                .unwrap()
+                .validate()
+                .is_ok(),
+            "100 years is fine"
+        );
+        assert!(
+            Config::from_toml_str("[dates]\nrange_days = 0\n")
+                .unwrap()
+                .validate()
+                .is_ok(),
+            "0 is clamped to 1, not an error"
+        );
     }
 
     #[test]

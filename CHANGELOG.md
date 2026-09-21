@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`[dates] range_days` was unvalidated and overflowed.** `offset_for` computes
+  `2 * range_days + 1`, so `range_days = 9223372036854775807` panicked with "attempt to
+  multiply with overflow" in a debug build (exit 101) and wrapped silently in release.
+  `validate()` now bounds it to `0..=36500` and the run exits `2` with
+  `invalid dates.range_days`, rather than aborting a batch part-way through over a config
+  typo. The arithmetic also saturates, since `DateShifter` is public and can be built
+  directly.
 - **A date that could not be shifted was passed through verbatim.** Under the Modified Dates
   option a malformed date (`2024010 `, `202401`) survived unchanged — silently, and without
   even being counted as a change — so the option's promise that the original date is not

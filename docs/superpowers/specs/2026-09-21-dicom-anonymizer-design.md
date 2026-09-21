@@ -178,7 +178,7 @@ clean_graphics = false
 [dates]
 strategy = "shift"                     # shift | zero | remove
 shift_salt = ""                        # empty => random per run
-range_days = 3650
+range_days = 3650                      # 0..=36500; bounds 2 * range_days + 1
 
 [uids]
 strategy = "remap"                     # remap | zero
@@ -300,6 +300,8 @@ the new SOP Instance UID, so the original instance UID cannot leak via the filen
 **Date shifting (deterministic per patient):**
 
 - Offset in days = `HMAC(salt, original_PatientID)` mapped into `[-range_days, +range_days]`.
+  `range_days` is validated into `0..=MAX_RANGE_DAYS` (36500), because the mapping computes
+  `2 * range_days + 1`: an unbounded value overflowed instead of being a config error.
 - Computed **before** PatientID is replaced; all dates for a patient share one offset.
 - Applied when `retain_longitudinal_temporal` (Modified Dates) is set, to `DA`/`DT`
   attributes whose resolved action is `C`; time-of-day is preserved. `TM` values are

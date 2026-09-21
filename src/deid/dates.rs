@@ -28,7 +28,9 @@ impl DateShifter {
         mac.update(patient_id.as_bytes());
         let bytes = mac.finalize().into_bytes();
         let n = u64::from_be_bytes(bytes[0..8].try_into().expect("8 bytes"));
-        let span = (2 * self.range_days + 1) as u64;
+        // Saturating: the config bounds `range_days`, but this type is public and can be
+        // constructed directly, so never overflow here.
+        let span = self.range_days.saturating_mul(2).saturating_add(1) as u64;
         (n % span) as i64 - self.range_days
     }
 
@@ -81,6 +83,15 @@ mod tests {
         let out = s.shift_dt("20240101123045.123", 5).unwrap();
         assert!(out.ends_with("123045.123"));
         assert_eq!(&out[0..8], "20240106");
+    }
+
+    #[test]
+    fn an_absurd_range_does_not_overflow() {
+        // Config validation rejects an out-of-range value, but DateShifter is public and can
+        // be constructed directly, so the arithmetic saturates instead of panicking in a
+        // debug build or wrapping in release.
+        let s = DateShifter::new(b"salt", i64::MAX);
+        let _ = s.offset_for("P1");
     }
 
     #[test]
