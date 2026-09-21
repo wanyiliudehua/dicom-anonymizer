@@ -707,6 +707,46 @@ fn a_zero_size_limit_disables_the_guard() {
 }
 
 #[test]
+fn verify_scans_non_dicom_sidecar_files() {
+    // Real exports ship a sidecar XML (CloudPACS dumps every attribute) that repeats
+    // the patient name, ID and institution. Nothing in it is DICOM, so a DICOM-only
+    // scan reports 0 hits - a false all-clear on a tree full of identifiers.
+    let src = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(dir.path().join("out"))
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+
+    // A tree holding only the sidecar: no DICOM at all.
+    let tree = tempfile::tempdir().unwrap();
+    std::fs::write(
+        tree.path().join("study.xml"),
+        "<?xml version=\"1.0\"?><Study><Patient>Doe^John</Patient></Study>",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(tree.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("study.xml"));
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

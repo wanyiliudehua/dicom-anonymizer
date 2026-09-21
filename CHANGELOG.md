@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--verify` only looked at DICOM files, and so gave false all-clears.** Real exports
+  ship a sidecar XML (CloudPACS writes one) that repeats every attribute; on the sample
+  dataset that file contains all 19 identifiers, and verifying a tree holding only it
+  reported `0 hit(s)` and exit `0`. Non-DICOM files are now scanned as text line by line,
+  reported with a windowed snippet around the match.
 - **The `C` clean action could corrupt text.** After removing an identifier it collapsed
   whitespace with `split_whitespace`, which counts NEL (U+0085) and NBSP as whitespace -
   and those are what undeclared single-byte text decodes to, so byte 0x85 silently became

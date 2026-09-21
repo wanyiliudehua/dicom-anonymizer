@@ -144,7 +144,9 @@ dicom-anonymizer \
   input tree's identifiers (see `verify`).
 - `--verify <FILE>`: a separate mode. Scan `--input` against a fingerprint and report
   any surviving identifier; `--config` and `--output` are not required and not used, so
-  a delivered tree can be audited without the originals or the original settings.
+  a delivered tree can be audited without the originals or the original settings. Non-DICOM
+  files are scanned as text line by line: a real CloudPACS export ships an XML dump of
+  every attribute beside the images, and a DICOM-only scan called such a tree clean.
 - `--output` is therefore optional at the clap level and validated manually: required in
   the default (anonymise) mode, unused by `--verify`.
 
@@ -569,6 +571,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   space: `split_whitespace` counts NEL (U+0085) and NBSP as whitespace, and those are
   exactly what undeclared single-byte text decodes to. `C` now trims only leading/trailing
   ASCII spaces and `^` and rewrites nothing else.
+- **`--verify` scans sidecar files as well as DICOM.** Found against the sample dataset,
+  which ships a CloudPACS XML holding all 19 identifiers: verifying a tree containing only
+  that file reported **0 hits and exit 0** before this change. The scan now walks non-DICOM
+  files line by line and reports a windowed snippet, so one hit inside a 90 KB single-line
+  XML is actionable rather than a flood. This also made `--verify` strictly stronger than
+  `--check-leaks`, which still inspects only the DICOM files a run wrote.
 - **`[limits] max_input_bytes`** was added beyond the plan after the memory profile was
   written down: nothing stopped a single huge input from exhausting the machine and
   getting the process killed mid-batch. It is a per-file guard checked before the file is

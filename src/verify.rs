@@ -164,11 +164,20 @@ impl Fingerprint {
     }
 }
 
-/// A text value in a scanned tree that matched a fingerprinted identifier.
+/// Where a match was found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Location {
+    /// A DICOM element.
+    Tag(Tag),
+    /// A line of a non-DICOM file (1-based).
+    Line(usize),
+}
+
+/// A value in a scanned tree that matched a fingerprinted identifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FingerprintHit {
     pub file: String,
-    pub tag: Tag,
+    pub location: Location,
     pub value: String,
     /// The offending substring exactly as it appears in the scanned file.
     pub matched: String,
@@ -185,13 +194,78 @@ pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Vec<Fingerprint
         for matched in fp.hits(text) {
             hits.push(FingerprintHit {
                 file: file.to_string(),
-                tag,
+                location: Location::Tag(tag),
                 value: text.to_string(),
                 matched,
             });
         }
     })?;
+    // Sidecar files count too: nothing about "is this tree clean?" is answered by
+    // looking only at the DICOM.
+    for_each_text_line(root, &mut |file, line, text| {
+        for matched in fp.hits(text) {
+            hits.push(FingerprintHit {
+                file: file.to_string(),
+                location: Location::Line(line),
+                value: snippet(text, &matched),
+                matched,
+            });
+        }
+    })?;
     Ok(hits)
+}
+
+/// Run `f` over every line of every non-DICOM file under `root`.
+///
+/// Real exports ship sidecars - CloudPACS writes an XML dump of every attribute, patient
+/// name and institution included - so scanning only DICOM files would report a tree full
+/// of identifiers as clean. Bytes are decoded lossily because the goal is to find ASCII
+/// identifiers, not to validate encodings.
+fn for_each_text_line(root: &Path, f: &mut impl FnMut(&str, usize, &str)) -> Result<()> {
+    for job in discovery::discover(root)? {
+        if job.dicom {
+            continue;
+        }
+        let Ok(bytes) = std::fs::read(&job.input) else {
+            continue;
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let file = job.rel.to_string_lossy().replace('\\', "/");
+        for (i, line) in text.lines().enumerate() {
+            f(&file, i + 1, line);
+        }
+    }
+    Ok(())
+}
+
+/// A window around a match, so reporting one hit in a 90 KB single-line XML does not
+/// dump the whole file into the log.
+fn snippet(line: &str, matched: &str) -> String {
+    const WINDOW: usize = 40;
+    let Some(pos) = line.find(matched) else {
+        return line.chars().take(WINDOW * 2).collect();
+    };
+    let start = line[..pos]
+        .char_indices()
+        .rev()
+        .nth(WINDOW)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let after = pos + matched.len();
+    let end = line[after..]
+        .char_indices()
+        .nth(WINDOW)
+        .map(|(i, _)| after + i)
+        .unwrap_or(line.len());
+    let mut out = String::new();
+    if start > 0 {
+        out.push('…');
+    }
+    out.push_str(&line[start..end]);
+    if end < line.len() {
+        out.push('…');
+    }
+    out
 }
 
 /// Salted SHA-256 as lowercase hex.
@@ -494,7 +568,7 @@ mod tests {
         let fp = fingerprint(&["YiJiShan".to_string()], "pepper");
         let hits = scan_fingerprint(d.path(), &fp).unwrap();
         assert_eq!(hits.len(), 1, "{hits:?}");
-        assert_eq!(hits[0].tag, Tag(0x0008, 0x1030));
+        assert_eq!(hits[0].location, Location::Tag(Tag(0x0008, 0x1030)));
         assert_eq!(hits[0].file, "x.dcm");
         assert_eq!(hits[0].matched, "YiJiShan");
     }

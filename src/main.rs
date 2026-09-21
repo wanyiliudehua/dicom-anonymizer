@@ -318,13 +318,25 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
         }
     };
     for h in &hits {
-        eprintln!(
-            "leak: {} ({:04X},{:04X}) contains `{}`",
-            h.file, h.tag.0, h.tag.1, h.matched
-        );
+        match h.location {
+            verify::Location::Tag(t) => eprintln!(
+                "leak: {} ({:04X},{:04X}) contains `{}`",
+                h.file, t.0, t.1, h.matched
+            ),
+            verify::Location::Line(n) => {
+                eprintln!("leak: {} line {n} contains `{}`", h.file, h.matched)
+            }
+        }
     }
+    // One hit per line says where to look; the surrounding text is in `value`.
+    let files_hit = {
+        let mut f: Vec<&str> = hits.iter().map(|h| h.file.as_str()).collect();
+        f.sort_unstable();
+        f.dedup();
+        f.len()
+    };
     eprintln!(
-        "verify: {} hit(s) using {} fingerprint(s) over {}",
+        "verify: {} hit(s) in {files_hit} file(s), using {} fingerprint(s) over {}",
         hits.len(),
         fp.hashes.len(),
         input.display()

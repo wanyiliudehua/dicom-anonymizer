@@ -52,8 +52,10 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
 - `--export-identifiers FILE`: also write a **salted fingerprint** of the input tree's
   identifiers, so the result can be re-verified later (see below).
 - `--verify FILE`: scan `--input` against a fingerprint *instead of* anonymizing. Needs
-  neither `--config` nor `--output`; prints every hit with its file, tag and offending
-  text, and exits `1` if anything survived.
+  neither `--config` nor `--output`; prints every hit with its file, its tag (or line)
+  and the offending text, and exits `1` if anything survived. It scans **non-DICOM files
+  too**: real exports ship a sidecar XML that repeats every attribute, so reporting a tree
+  clean while such a file sits in it would be a false all-clear.
 
 ### Verifying later
 
@@ -69,6 +71,17 @@ plaintext list of patients. The salt sits beside the hashes so they can be recom
 which makes the file a *derived* artefact that still deserves care (common names can be
 brute-forced out of hashes). Hits are reported with the offending substring, so
 `--verify` doubles as a triage tool on a tree you did not produce.
+
+Two things to know about sidecars. `--verify` reads **non-DICOM files as text, line by
+line**, because a real CloudPACS export ships an XML dump of every attribute — patient
+name, ID, accession number and institution included — beside the images. Second, the
+anonymiser does **not** copy non-DICOM files into the output tree: they are logged
+`skipped` and counted, so the delivered tree does not silently gain a file full of PHI,
+but it does silently *lose* a file. If you need the sidecar downstream, de-identify it
+separately — and `--verify` will tell you whether it still carries identifiers.
+
+`--check-leaks` is the narrower, in-run check: it inspects only the DICOM files the run
+just wrote. Use `--verify` for a full audit of a tree.
 
 See `dicom-anonymizer.example.toml` for all options.
 
