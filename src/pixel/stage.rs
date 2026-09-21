@@ -310,4 +310,96 @@ mod tests {
         assert!(unsupported_without_feature("1.2.840.10008.1.2.4.81"));
         assert!(!unsupported_without_feature("1.2.840.10008.1.2.1"));
     }
+
+    /// A fuller fixture: sized, multi-frame, with the attributes an encoder needs.
+    fn build_obj(
+        rows: u16,
+        cols: u16,
+        spp: u16,
+        frames: u16,
+        ts: &str,
+    ) -> dicom_object::FileDicomObject<dicom_object::InMemDicomObject> {
+        use dicom_core::{DataElement, PrimitiveValue};
+        use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
+        let u16v = |n: u16| PrimitiveValue::U16(vec![n].into());
+        let n = rows as usize * cols as usize * spp as usize * frames as usize;
+        let mut elems = vec![
+            DataElement::new(tags::SOP_CLASS_UID, VR::UI, "1.2.840.10008.5.1.4.1.1.7"),
+            DataElement::new(tags::SOP_INSTANCE_UID, VR::UI, "1.2.3.4"),
+            DataElement::new(tags::ROWS, VR::US, u16v(rows)),
+            DataElement::new(tags::COLUMNS, VR::US, u16v(cols)),
+            DataElement::new(tags::BITS_ALLOCATED, VR::US, u16v(8)),
+            DataElement::new(tags::BITS_STORED, VR::US, u16v(8)),
+            DataElement::new(tags::HIGH_BIT, VR::US, u16v(7)),
+            DataElement::new(tags::PIXEL_REPRESENTATION, VR::US, u16v(0)),
+            DataElement::new(tags::SAMPLES_PER_PIXEL, VR::US, u16v(spp)),
+            DataElement::new(tags::PHOTOMETRIC_INTERPRETATION, VR::CS, "MONOCHROME2"),
+            DataElement::new(tags::BURNED_IN_ANNOTATION, VR::CS, "NO"),
+        ];
+        if frames > 1 {
+            elems.push(DataElement::new(
+                tags::NUMBER_OF_FRAMES,
+                VR::IS,
+                frames.to_string(),
+            ));
+        }
+        elems.push(DataElement::new(
+            tags::PIXEL_DATA,
+            VR::OB,
+            PrimitiveValue::U8(vec![0u8; n].into()),
+        ));
+        InMemDicomObject::from_element_iter(elems)
+            .with_meta(FileMetaTableBuilder::new().transfer_syntax(ts))
+            .unwrap()
+    }
+
+    #[test]
+    fn multi_frame_masks_only_selected_frame() {
+        let cfg = Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\nfill=7\n[[pixels.regions]]\nshape=\"rect\"\nx=0\ny=0\nwidth=1\nheight=1\nframes=[1]\n",
+        )
+        .unwrap();
+        let mut file = build_obj(2, 2, 1, 3, "1.2.840.10008.1.2.1");
+        let r = process(&mut file, &cfg).unwrap();
+        assert_eq!(r.regions_masked, 1);
+        assert_eq!(r.samples_masked, 1);
+        let px = file
+            .element(tags::PIXEL_DATA)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            .to_vec();
+        assert_eq!(&px[0..4], &[0, 0, 0, 0]); // frame 0 untouched
+        assert_eq!(px[4], 7); // frame 1, first sample
+        assert_eq!(px[5], 0);
+        assert_eq!(&px[8..12], &[0, 0, 0, 0]); // frame 2 untouched
+    }
+
+    #[test]
+    fn compressed_source_is_transcoded_then_masked() {
+        use dicom_pixeldata::Transcode;
+        let mut file = build_obj(8, 8, 1, 1, "1.2.840.10008.1.2.1");
+        let jpeg = dicom_transfer_syntax_registry::entries::JPEG_BASELINE.erased();
+        file.transcode_with_options(&jpeg, dicom_encoding::adapters::EncodeOptions::default())
+            .unwrap();
+        assert_eq!(file.meta().transfer_syntax(), "1.2.840.10008.1.2.4.50");
+
+        let cfg = Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\nfill=9\n[[pixels.regions]]\nshape=\"rect\"\nx=0\ny=0\nwidth=4\nheight=4\n",
+        )
+        .unwrap();
+        let r = process(&mut file, &cfg).unwrap();
+        assert_eq!(r.regions_masked, 1);
+        // output is uncompressed again
+        assert_eq!(file.meta().transfer_syntax(), "1.2.840.10008.1.2.1");
+        let px = file
+            .element(tags::PIXEL_DATA)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            .to_vec();
+        assert_eq!(px.len(), 64);
+        assert_eq!(px[0], 9);
+        assert_eq!(px[1], 9);
+    }
 }

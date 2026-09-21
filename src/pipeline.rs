@@ -381,4 +381,113 @@ mod tests {
         assert!(out.path().join("sub/orig-name.dcm").exists());
         assert_eq!(rec.output.as_deref(), Some("sub/orig-name.dcm"));
     }
+
+    fn make_pixel_dicom(path: &std::path::Path) {
+        use dicom_core::PrimitiveValue;
+        let u16v = |n: u16| PrimitiveValue::U16(vec![n].into());
+        let obj = InMemDicomObject::from_element_iter([
+            DataElement::new(
+                dicom_dictionary_std::tags::SOP_CLASS_UID,
+                VR::UI,
+                "1.2.840.10008.5.1.4.1.1.7",
+            ),
+            DataElement::new(
+                dicom_dictionary_std::tags::SOP_INSTANCE_UID,
+                VR::UI,
+                "1.2.840.10008.1.2.3",
+            ),
+            DataElement::new(dicom_dictionary_std::tags::ROWS, VR::US, u16v(2)),
+            DataElement::new(dicom_dictionary_std::tags::COLUMNS, VR::US, u16v(2)),
+            DataElement::new(dicom_dictionary_std::tags::BITS_ALLOCATED, VR::US, u16v(8)),
+            DataElement::new(dicom_dictionary_std::tags::SAMPLES_PER_PIXEL, VR::US, u16v(1)),
+            DataElement::new(
+                dicom_dictionary_std::tags::PIXEL_DATA,
+                VR::OB,
+                PrimitiveValue::U8(vec![0u8; 4].into()),
+            ),
+        ]);
+        obj.with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
+            .unwrap()
+            .write_to_file(path)
+            .unwrap();
+    }
+
+    #[test]
+    fn out_of_bounds_region_is_per_file_error() {
+        use crate::audit::Status;
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let inpath = src.path().join("p.dcm");
+        make_pixel_dicom(&inpath);
+        let cfg = crate::config::Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\n[[pixels.regions]]\nshape=\"rect\"\nwidth=9\nheight=9\n",
+        )
+        .unwrap();
+        let shared = Shared {
+            cfg,
+            uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
+            dates: crate::deid::dates::DateShifter::new(b"s", 10),
+            out_root: out.path().to_path_buf(),
+            dry_run: false,
+        };
+        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let mut sink = Vec::new();
+        let rec = process_job(&shared, &job, &mut sink).unwrap();
+        assert_eq!(rec.status, Status::Error);
+        assert!(rec.error.unwrap_or_default().contains("pixel"));
+        // nothing was written for this file
+        assert!(std::fs::read_dir(out.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn sequence_phi_is_anonymized() {
+        use crate::audit::Status;
+        use dicom_core::value::DataSetSequence;
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let inpath = src.path().join("p.dcm");
+        let inner = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0010, 0x0010),
+            VR::PN,
+            "Doe^John",
+        )]);
+        let obj = InMemDicomObject::from_element_iter([
+            DataElement::new(
+                dicom_dictionary_std::tags::SOP_CLASS_UID,
+                VR::UI,
+                "1.2.840.10008.5.1.4.1.1.7",
+            ),
+            DataElement::new(
+                dicom_dictionary_std::tags::SOP_INSTANCE_UID,
+                VR::UI,
+                "1.2.840.10008.1.2.3",
+            ),
+            DataElement::new(Tag(0x0008, 0x1115), VR::SQ, DataSetSequence::from(vec![inner])),
+        ]);
+        obj.with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
+            .unwrap()
+            .write_to_file(&inpath)
+            .unwrap();
+
+        let shared = Shared {
+            cfg: crate::config::Config::default(),
+            uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
+            dates: crate::deid::dates::DateShifter::new(b"s", 10),
+            out_root: out.path().to_path_buf(),
+            dry_run: false,
+        };
+        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let mut sink = Vec::new();
+        let rec = process_job(&shared, &job, &mut sink).unwrap();
+        assert_eq!(rec.status, Status::Ok);
+        let written = out.path().join(rec.output.unwrap());
+        let o = dicom_object::open_file(&written).unwrap();
+        // unruled sequence is kept, but its nested PHI is gone
+        assert!(o.element(Tag(0x0008, 0x1115)).is_ok());
+        let bytes = std::fs::read(&written).unwrap();
+        assert!(
+            !bytes.windows(8).any(|w| w == b"Doe^John"),
+            "nested PHI survived"
+        );
+    }
 }
