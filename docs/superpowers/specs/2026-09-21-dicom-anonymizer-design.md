@@ -166,7 +166,7 @@ base = "ps3.15-basic"                  # ps3.15-basic | research
 strategy = "aggressive"                # conservative | aggressive
 retain_longitudinal_temporal = false   # Modified Dates option (shift)
 retain_longitudinal_full_dates = false # Full Dates option (keep verbatim)
-retain_safe_private = false
+retain_safe_private = false            # keeps EVERY private attribute; no allow-list
 retain_uids = false
 retain_device_identity = false
 retain_institution_identity = false
@@ -277,7 +277,10 @@ scrubbed.
 - **Repeating groups** that cannot be a single tag — Curve Data `(50xx,xxxx)`, Overlay
   Data/Comments `(60xx,3000|4000)` — are matched by group range and removed.
 - **Private (odd-group) tags** are removed unless `retain_safe_private` is set, in which
-  case they are retained (approximation: no safe-private allowlist).
+  case **all** of them are retained. This is an approximation, not PS3.15's Retain Safe
+  Private Option: no allow-list of safe private attributes is consulted, so an identifying
+  private element survives. The run warns when the flag is on, and `--check-leaks` is the
+  check designed for exactly this case.
 - **Sequences** with an `X` rule are removed whole; other sequences are recursed into.
   Item-level errors propagate.
 
@@ -628,6 +631,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Progress reporting** was added beyond the plan: a batch can run for hours, and the
   only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
   a terminal, so redirected output stays byte-identical to before.
+- **`retain_safe_private` no longer claims to be PS3.15's "Retain Safe Private".** The spec
+  admitted the approximation, but the README option table and the example config - the two
+  places a user actually reads - described it as "keep safe private attributes", while the
+  implementation retains *every* private attribute with no allow-list. The user-facing text
+  now says so, a test pins the behaviour with an identifying private element, and the run
+  warns when the flag is on.
 - **`--require-complete`** was added beyond the plan so the completion marker can be
   asserted rather than merely reported: a clean tree and a finished tree are different
   claims, and automated acceptance needs the second one.

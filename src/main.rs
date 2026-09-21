@@ -59,6 +59,16 @@ fn run() -> i32 {
         };
     }
 
+    // The flag is named after PS3.15's Retain Safe Private option but implements something
+    // broader: there is no allow-list, so every private attribute survives. Private blocks
+    // routinely carry identifiers, so the operator hears about it once per run.
+    if cfg.profile.retain_safe_private {
+        eprintln!(
+            "warning: retain_safe_private retains every private attribute, not only safe ones \
+             (no PS3.15 allow-list); check the result with --check-leaks"
+        );
+    }
+
     if !args.input.is_dir() {
         eprintln!("error: input `{}` is not a directory", args.input.display());
         return 2;

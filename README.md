@@ -176,7 +176,7 @@ Basic Profile action (options are resolved in table column order; later wins):
 
 | config flag | option |
 |---|---|
-| `retain_safe_private` | Retain Safe Private |
+| `retain_safe_private` | Retain **all** private attributes — PS3.15's "Retain Safe Private" is *not* implemented (there is no allow-list); the run warns when this is on |
 | `retain_uids` | Retain UIDs |
 | `retain_device_identity` | Retain Device Identity |
 | `retain_institution_identity` | Retain Institution Identity |

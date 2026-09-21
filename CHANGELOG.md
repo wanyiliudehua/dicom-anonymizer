@@ -74,6 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`retain_safe_private` was described as PS3.15's "Retain Safe Private" option, but it
+  retains every private attribute** — no allow-list is consulted, so an identifying private
+  element survives. The spec disclosed the approximation; the README option table and the
+  example config, which are where a user looks, said "keep safe private attributes". They
+  now say "every private attribute", a test pins the behaviour with an identifying private
+  element, and the run prints a warning when the flag is on.
 - **Masking silently did nothing on 32-bit pixel data while reporting success.**
   `geometry::write_sample` handled only 1- and 2-byte samples and fell through to writing
   nothing, yet both masking paths still incremented `samples_masked`, and `stage.rs` never

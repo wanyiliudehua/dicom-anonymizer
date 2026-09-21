@@ -510,6 +510,21 @@ mod tests {
         )]);
         apply(&mut o2, &c2).unwrap();
         assert!(o2.element(Tag(0x0009, 0x0010)).is_ok());
+
+        // No allow-list is consulted, so even an obviously identifying private element
+        // survives. That is why the flag is documented as an approximation of the PS3.15
+        // option rather than as an implementation of it, and why main warns when it is on.
+        let mut o3 = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0009, 0x1001),
+            VR::LO,
+            "Doe^John",
+        )]);
+        apply(&mut o3, &c2).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o3, Tag(0x0009, 0x1001)).as_deref(),
+            Some("Doe^John"),
+            "the safe-private option is not a safety filter"
+        );
     }
 
     #[test]

@@ -997,6 +997,44 @@ fn parallelism_is_capped_so_input_in_flight_stays_bounded() {
 }
 
 #[test]
+fn enabling_retain_safe_private_warns_that_it_retains_everything() {
+    // The flag is named after PS3.15's Retain Safe Private option, but it retains *all*
+    // private attributes - there is no allow-list. Saying so once per run is the least the
+    // tool can do, because private blocks routinely carry identifiers.
+    let src = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("on.toml");
+    std::fs::write(&cfg_path, "[profile]\nretain_safe_private = true\n").unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("every private attribute"));
+
+    // ... and stays quiet when the option is off, which is the default.
+    let quiet = tempfile::tempdir().unwrap();
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(quiet.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("every private attribute").not());
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

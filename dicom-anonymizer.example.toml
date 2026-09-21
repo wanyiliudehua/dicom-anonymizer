@@ -6,7 +6,7 @@ strategy = "aggressive"              # conservative | aggressive
 # PS3.15 options (E.1-1 option columns). Each removes one restriction:
 retain_longitudinal_temporal = false # Modified Dates (shift dates)
 retain_longitudinal_full_dates = false # Full Dates (keep dates verbatim)
-retain_safe_private = false          # keep safe private attributes
+retain_safe_private = false          # keep EVERY private attribute (no safe-private allow-list)
 retain_uids = false                  # keep original UIDs
 retain_device_identity = false       # keep device identity
 retain_institution_identity = false  # keep institution identity
