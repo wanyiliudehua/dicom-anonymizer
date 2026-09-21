@@ -906,6 +906,37 @@ fn require_complete_without_verify_is_an_argument_error() {
 }
 
 #[test]
+fn verbose_reports_progress_but_the_default_is_quiet() {
+    let src = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("a.dcm"), "Doe^John", "1.2.3");
+    common::write_fixture(&src.path().join("b.dcm"), "Roe^Jane", "1.2.4");
+
+    let out = tempfile::tempdir().unwrap();
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .arg("--verbose")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("progress: 2/2 files (100%)"));
+
+    // Piped stderr is not a terminal, so an unasked-for run stays quiet.
+    let quiet = tempfile::tempdir().unwrap();
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(quiet.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("progress:").not());
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

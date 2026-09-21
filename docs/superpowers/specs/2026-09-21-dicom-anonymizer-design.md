@@ -138,7 +138,9 @@ dicom-anonymizer \
   reported on stderr and forces exit `1`. Ignored under `--dry-run`, which has no output
   tree to scan.
 - `--fail-fast`: abort on the first per-file error.
-- `--verbose`: extra progress on stderr.
+- `--verbose`: report progress, and extra detail on stderr. Progress is also shown when
+  stderr is a terminal, so an interactive run is not a black box while a redirected one
+  stays clean. A line is emitted at most every two seconds, and always for the final file.
 - `--version` / `--help`: standard clap output.
 - `--export-identifiers <FILE>`: additionally write a salted, hashed fingerprint of the
   input tree's identifiers (see `verify`).
@@ -419,6 +421,12 @@ uses the sequential path. Per-file state is local and UID/date mapping are pure
 functions, so there is no shared mutable state. Audit lines are collected per file and
 emitted in input order.
 
+Progress is counted from whichever thread finishes a file, so the count is truthful
+even though completions arrive out of order, and each line is written with a single
+`eprintln!` so lines never interleave. Reporting cadence is unit-tested rather than
+observed: on the sample dataset the whole batch finishes inside one interval, so only the
+final line is ever emitted there.
+
 ## 15. Testing
 
 Current suite: **80 unit + 4 integration tests**.
@@ -532,6 +540,8 @@ dicom-anonymizer/
    file un-anonymised records `partial`; `--dry-run` writes no marker.
 10. `--verify --require-complete` rejects a tree with no marker and a tree whose marker
     says `partial`, and accepts a finished one.
+11. `--verbose` emits a progress line with count, throughput and ETA; without it, and with
+    stderr redirected, nothing extra is printed.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -594,6 +604,9 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   files line by line and reports a windowed snippet, so one hit inside a 90 KB single-line
   XML is actionable rather than a flood. This also made `--verify` strictly stronger than
   `--check-leaks`, which still inspects only the DICOM files a run wrote.
+- **Progress reporting** was added beyond the plan: a batch can run for hours, and the
+  only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
+  a terminal, so redirected output stays byte-identical to before.
 - **`--require-complete`** was added beyond the plan so the completion marker can be
   asserted rather than merely reported: a clean tree and a finished tree are different
   claims, and automated acceptance needs the second one.

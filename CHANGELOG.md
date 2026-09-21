@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Progress reporting on stderr: a line every couple of seconds with the file count,
+  throughput and ETA, plus a final line. Shown when stderr is a terminal, or always with
+  `--verbose`; redirected output stays quiet, so existing logs are unchanged. Emitted from
+  whichever worker finishes a file, so it is truthful despite out-of-order completions.
 - `--require-complete`: with `--verify`, also require `run.json` to describe a complete run.
   A tree that is clean but unfinished then fails, so an acceptance step can assert
   "verified **and** complete" rather than just "nothing matched". Used without `--verify`

@@ -12,6 +12,7 @@ mod writer;
 
 use clap::Parser;
 use pipeline::Shared;
+use std::io::IsTerminal;
 use std::io::Write;
 
 fn main() {
@@ -124,6 +125,10 @@ fn run() -> i32 {
 
     let mut audit_failed = false;
     let mut summary = report::Summary::default();
+    // Progress is for a human watching a long batch: asked for with --verbose, or
+    // offered when stderr is a terminal. Redirected output stays quiet.
+    let progress =
+        report::Progress::new(jobs.len(), args.verbose || std::io::stderr().is_terminal());
     if args.fail_fast || args.jobs == Some(1) {
         for job in &jobs {
             let mut line = Vec::new();
@@ -146,6 +151,9 @@ fn run() -> i32 {
                     }
                 }
             }
+            if let Some(line) = progress.tick() {
+                eprintln!("{line}");
+            }
         }
     } else {
         use rayon::prelude::*;
@@ -164,6 +172,11 @@ fn run() -> i32 {
                 match pipeline::process_job(&shared, job, &mut line) {
                     Ok(rec) => s.count(rec.status),
                     Err(_) => s.count(audit::Status::Error),
+                }
+                // Reported from whichever thread finishes, so the counter stays honest
+                // even though completions arrive out of order.
+                if let Some(line) = progress.tick() {
+                    eprintln!("{line}");
                 }
                 (s, line)
             })

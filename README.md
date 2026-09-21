@@ -42,7 +42,10 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
   **conservative** clears the direct identifiers (name, ID, birth date,
   accession number, institution, device serial, physician names, ...) but
   retains patient demographics (sex, age, size, weight) and all dates/times.
-- `--jobs N`: process files in parallel with N threads.
+- `--jobs N`: process files in parallel with N threads. Progress is reported on stderr
+  when stderr is a terminal, or always with `--verbose`: a line every couple of seconds
+  giving the count, throughput and ETA, plus a final line when the batch finishes. Piped
+  output stays clean.
 - `--dry-run`: run everything except writes and print audit records to stdout.
 - `--check-leaks`: after the run, verify the result by re-reading the input tree for
   identifying strings (person names and their components, patient / other-patient IDs,
