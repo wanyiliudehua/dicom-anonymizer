@@ -87,6 +87,13 @@ pub fn write_jsonl(mut w: impl Write, r: &Record) -> Result<()> {
     Ok(())
 }
 
+/// Write a pre-rendered audit line to the sink, surfacing IO errors so the
+/// caller can fail the run instead of silently losing records.
+pub fn write_raw(w: &mut impl Write, line: &[u8]) -> Result<()> {
+    w.write_all(line)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +113,21 @@ mod tests {
         let s = serde_json::to_string(&r).unwrap();
         assert!(s.contains("boom"));
         assert!(s.contains("\"status\":\"error\""));
+    }
+
+    struct FailWriter;
+    impl std::io::Write for FailWriter {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("disk full"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn write_raw_reports_io_failure() {
+        let mut w = FailWriter;
+        assert!(write_raw(&mut w, b"x").is_err());
     }
 }

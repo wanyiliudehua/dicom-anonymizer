@@ -62,10 +62,23 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
         return Ok(0);
     }
 
-    let burned = ds::get_string(obj, tags::BURNED_IN_ANNOTATION);
-    if burned.is_none() && cfg.pixels.on_missing_burnedin == OnMissing::Skip {
+    // No pixel data (e.g. SR): nothing to mask and nothing to transcode.
+    if obj.element(tags::PIXEL_DATA).is_err() {
         return Ok(0);
     }
+
+    let burned = ds::get_string(obj, tags::BURNED_IN_ANNOTATION);
+    let mask_all = match (burned.is_none(), &cfg.pixels.on_missing_burnedin) {
+        (true, OnMissing::Skip) => return Ok(0),
+        (true, OnMissing::MaskAll) => true,
+        (true, OnMissing::Warn) => {
+            eprintln!(
+                "warning: BurnedInAnnotation (0028,0301) absent; applying configured regions only"
+            );
+            false
+        }
+        (false, _) => false,
+    };
 
     // Decompress to Explicit VR LE if the source uses another transfer syntax.
     let ts_uid = obj.meta().transfer_syntax().to_string();
@@ -73,10 +86,6 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
         let ts = dicom_transfer_syntax_registry::entries::EXPLICIT_VR_LITTLE_ENDIAN.erased();
         obj.transcode_with_options(&ts, dicom_encoding::adapters::EncodeOptions::default())
             .map_err(|e| AnonError::Dicom(format!("transcode failed: {e}")))?;
-    }
-
-    if obj.element(tags::PIXEL_DATA).is_err() {
-        return Ok(0); // no pixel data (e.g. SR): nothing to mask
     }
 
     let geo = geometry_from_tags(
@@ -90,6 +99,15 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
         return Err(AnonError::Dicom("missing Rows/Columns".into()));
     }
     let fill = resolve_fill(cfg, geo.bits_allocated);
+
+    // PlanarConfiguration=1 (colour-by-plane) needs plane-strided offsets; we
+    // reject it rather than silently masking the wrong samples.
+    let planar = get_u16(obj, tags::PLANAR_CONFIGURATION).unwrap_or(0);
+    if planar == 1 && geo.samples_per_pixel > 1 {
+        return Err(AnonError::Dicom(
+            "PlanarConfiguration=1 is not supported for masking".into(),
+        ));
+    }
 
     let mut pixels = obj
         .element(tags::PIXEL_DATA)
@@ -108,24 +126,39 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
     }
 
     let mut masked = 0usize;
-    for region in selected {
-        for frame in frames_for(region, geo.frames) {
-            match region.shape {
-                Shape::Rect => {
-                    masked += mask_rect_in_place(
-                        &mut pixels,
-                        &geo,
-                        frame,
-                        region.x,
-                        region.y,
-                        region.width,
-                        region.height,
-                        fill,
-                    )?;
-                }
-                Shape::Polygon => {
-                    masked +=
-                        mask_polygon_in_place(&mut pixels, &geo, frame, &region.points, fill)?;
+    if mask_all {
+        for frame in 0..geo.frames {
+            masked += mask_rect_in_place(
+                &mut pixels,
+                &geo,
+                frame,
+                0,
+                0,
+                geo.columns,
+                geo.rows,
+                fill,
+            )?;
+        }
+    } else {
+        for region in selected {
+            for frame in frames_for(region, geo.frames) {
+                match region.shape {
+                    Shape::Rect => {
+                        masked += mask_rect_in_place(
+                            &mut pixels,
+                            &geo,
+                            frame,
+                            region.x,
+                            region.y,
+                            region.width,
+                            region.height,
+                            fill,
+                        )?;
+                    }
+                    Shape::Polygon => {
+                        masked +=
+                            mask_polygon_in_place(&mut pixels, &geo, frame, &region.points, fill)?;
+                    }
                 }
             }
         }
@@ -170,5 +203,74 @@ mod tests {
         assert_eq!(resolve_fill(&cfg, 16), 65535);
         let cfg0 = Config::from_toml_str("[pixels]\nfill = 7\n").unwrap();
         assert_eq!(resolve_fill(&cfg0, 16), 7);
+    }
+
+    fn build_pixel_obj(
+        spp: u16,
+        planar: Option<u16>,
+    ) -> dicom_object::FileDicomObject<dicom_object::InMemDicomObject> {
+        use dicom_core::{DataElement, PrimitiveValue};
+        use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
+        let n_bytes = 2 * 2 * spp as usize;
+        let mut elems = vec![
+            DataElement::new(tags::SOP_CLASS_UID, VR::UI, "1.2.840.10008.5.1.4.1.1.7"),
+            DataElement::new(tags::SOP_INSTANCE_UID, VR::UI, "1.2.3.4"),
+            DataElement::new(tags::ROWS, VR::US, PrimitiveValue::U16(vec![2u16].into())),
+            DataElement::new(tags::COLUMNS, VR::US, PrimitiveValue::U16(vec![2u16].into())),
+            DataElement::new(
+                tags::BITS_ALLOCATED,
+                VR::US,
+                PrimitiveValue::U16(vec![8u16].into()),
+            ),
+            DataElement::new(
+                tags::SAMPLES_PER_PIXEL,
+                VR::US,
+                PrimitiveValue::U16(vec![spp].into()),
+            ),
+            DataElement::new(
+                tags::PIXEL_DATA,
+                VR::OB,
+                PrimitiveValue::U8(vec![0u8; n_bytes].into()),
+            ),
+        ];
+        if let Some(p) = planar {
+            elems.push(DataElement::new(
+                tags::PLANAR_CONFIGURATION,
+                VR::US,
+                PrimitiveValue::U16(vec![p].into()),
+            ));
+        }
+        InMemDicomObject::from_element_iter(elems)
+            .with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
+            .unwrap()
+    }
+
+    #[test]
+    fn mask_all_fills_whole_frame_when_burnedin_absent() {
+        let cfg = Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\nfill=9\non_missing_burnedin=\"mask_all\"\n\
+             [[pixels.regions]]\nshape=\"rect\"\nx=0\ny=0\nwidth=1\nheight=1\n",
+        )
+        .unwrap();
+        let mut file = build_pixel_obj(1, None);
+        let n = process(&mut file, &cfg).unwrap();
+        assert_eq!(n, 4);
+        let bytes = file
+            .element(tags::PIXEL_DATA)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            .to_vec();
+        assert!(bytes.iter().all(|b| *b == 9));
+    }
+
+    #[test]
+    fn planar_configuration_one_is_error_when_masking() {
+        let cfg = Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\n[[pixels.regions]]\nshape=\"rect\"\nwidth=1\nheight=1\n",
+        )
+        .unwrap();
+        let mut file = build_pixel_obj(3, Some(1));
+        assert!(process(&mut file, &cfg).is_err());
     }
 }

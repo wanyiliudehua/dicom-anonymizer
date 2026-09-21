@@ -31,6 +31,13 @@ fn run() -> i32 {
         None => config::Config::default(),
     };
 
+    if cfg.profile.clean_descriptors || cfg.profile.clean_structured_content {
+        eprintln!(
+            "warning: clean_descriptors / clean_structured_content are not implemented; \
+             those fields are not cleaned"
+        );
+    }
+
     if !args.input.is_dir() {
         eprintln!("error: input `{}` is not a directory", args.input.display());
         return 2;
@@ -86,6 +93,7 @@ fn run() -> i32 {
         None => Box::new(stdout),
     };
 
+    let mut audit_failed = false;
     let mut summary = report::Summary::default();
     if args.fail_fast || args.jobs.unwrap_or(0) == 0 {
         for job in &jobs {
@@ -93,7 +101,10 @@ fn run() -> i32 {
             match pipeline::process_job(&shared, job, &mut line) {
                 Ok(rec) => {
                     summary.count(rec.status);
-                    let _ = log.write_all(&line);
+                    if audit::write_raw(&mut log, &line).is_err() {
+                        audit_failed = true;
+                        eprintln!("error: failed to write audit record");
+                    }
                     if args.fail_fast && rec.status == audit::Status::Error {
                         break;
                     }
@@ -131,7 +142,10 @@ fn run() -> i32 {
             summary.skipped += s.skipped;
             summary.unsupported += s.unsupported;
             summary.error += s.error;
-            let _ = log.write_all(line);
+            if audit::write_raw(&mut log, line).is_err() {
+                audit_failed = true;
+                eprintln!("error: failed to write audit record");
+            }
         }
     }
 
@@ -142,6 +156,9 @@ fn run() -> i32 {
         "ok={} skipped={} unsupported={} error={}",
         summary.ok, summary.skipped, summary.unsupported, summary.error
     );
+    if audit_failed {
+        return 1;
+    }
     summary.exit_code()
 }
 

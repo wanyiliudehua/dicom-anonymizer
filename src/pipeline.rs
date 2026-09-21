@@ -10,6 +10,7 @@ use crate::discovery::Job;
 use crate::error::Result;
 use crate::pixel::stage;
 use crate::writer;
+use dicom_object::InMemDicomObject;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -26,6 +27,14 @@ const DICOMDIR_SOP: &str = "1.2.840.10008.1.3.10";
 
 fn rel_str(rel: &Path) -> String {
     rel.to_string_lossy().replace('\\', "/")
+}
+
+/// DICOMDIR identifies itself in the file meta (0002,0002); fall back to the
+/// dataset's SOP Class UID for non-standard files.
+fn is_dicomdir(obj: &dicom_object::FileDicomObject<InMemDicomObject>) -> bool {
+    let ds_sop = ds::get_string(obj, dicom_dictionary_std::tags::SOP_CLASS_UID);
+    let meta_sop = obj.meta().media_storage_sop_class_uid().to_string();
+    ds_sop.as_deref() == Some(DICOMDIR_SOP) || meta_sop == DICOMDIR_SOP
 }
 
 fn temp_path(target: &Path) -> PathBuf {
@@ -60,7 +69,8 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
     let ts_in = obj.meta().transfer_syntax().to_string();
 
     let sop = ds::get_string(&obj, dicom_dictionary_std::tags::SOP_CLASS_UID);
-    if sop.as_deref() == Some(DICOMDIR_SOP) {
+    let _ = sop;
+    if is_dicomdir(&obj) {
         let rec = Record::skipped(input_str, Status::SkippedDicomdir);
         emit(log, &rec);
         return Ok(rec);
@@ -203,5 +213,27 @@ mod tests {
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, crate::audit::Status::Ok);
         assert!(std::fs::read_dir(out.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn dicomdir_detected_from_file_meta_sop_class() {
+        use dicom_object::FileMetaTableBuilder;
+        let file = InMemDicomObject::new_empty()
+            .with_meta(
+                FileMetaTableBuilder::new()
+                    .transfer_syntax("1.2.840.10008.1.2.1")
+                    .media_storage_sop_class_uid("1.2.840.10008.1.3.10"),
+            )
+            .unwrap();
+        assert!(is_dicomdir(&file));
+
+        let not_dir = InMemDicomObject::new_empty()
+            .with_meta(
+                FileMetaTableBuilder::new()
+                    .transfer_syntax("1.2.840.10008.1.2.1")
+                    .media_storage_sop_class_uid("1.2.840.10008.5.1.4.1.1.7"),
+            )
+            .unwrap();
+        assert!(!is_dicomdir(&not_dir));
     }
 }

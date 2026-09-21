@@ -1,6 +1,6 @@
 //! PS3.15 action engine: apply X/Z/D/U/C/K to a dataset, recursing sequences.
 
-use crate::config::{Action, Config, DateStrategy};
+use crate::config::{Action, Config, DateStrategy, UidStrategy};
 use crate::deid::dataset as ds;
 use crate::deid::dates::DateShifter;
 use crate::deid::profile::effective_rules;
@@ -43,6 +43,16 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
             .element(tag)
             .map(|e| e.vr() == VR::SQ)
             .unwrap_or(false);
+
+        // Private (odd-group) tags are removed by default; retained only when
+        // the safe-private option is on.
+        if tag.0 % 2 == 1 {
+            if !ctx.cfg.profile.retain_safe_private && ds::remove(obj, tag) {
+                changed += 1;
+            }
+            continue;
+        }
+
         if is_seq {
             changed += apply_to_sequence(obj, tag, ctx)?;
             continue;
@@ -61,24 +71,35 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
             continue;
         }
 
-        // Date handling takes precedence for date tags when shifting is on.
-        if is_date_tag(tag)
-            && ctx.cfg.dates.strategy == DateStrategy::Shift
-            && (ctx.cfg.profile.retain_longitudinal_temporal || action != Action::Z)
-        {
-            if let Some(v) = ds::get_string(obj, tag) {
-                let shifted = match v.len() {
-                    8 => ctx.dates.shift_da(&v, offset),
-                    _ => ctx.dates.shift_dt(&v, offset),
-                };
-                if let Some(s) = shifted {
-                    ds::set_string(obj, tag, VR::DA, &s);
-                    changed += 1;
+        // Date handling takes precedence for date tags.
+        if is_date_tag(tag) {
+            match ctx.cfg.dates.strategy {
+                DateStrategy::Remove => {
+                    if ds::remove(obj, tag) {
+                        changed += 1;
+                    }
+                    continue;
                 }
+                DateStrategy::Shift
+                    if ctx.cfg.profile.retain_longitudinal_temporal
+                        || action != Action::Z =>
+                {
+                    if let Some(v) = ds::get_string(obj, tag) {
+                        let shifted = match v.len() {
+                            8 => ctx.dates.shift_da(&v, offset),
+                            _ => ctx.dates.shift_dt(&v, offset),
+                        };
+                        if let Some(s) = shifted {
+                            ds::set_string(obj, tag, VR::DA, &s);
+                            changed += 1;
+                        }
+                    }
+                    // Under shifting a date tag is either shifted or left as-is;
+                    // malformed dates pass through instead of falling through to zeroing.
+                    continue;
+                }
+                _ => {}
             }
-            // Under shifting a date tag is either shifted or left as-is;
-            // malformed dates pass through instead of falling through to zeroing.
-            continue;
         }
 
         match action {
@@ -99,7 +120,11 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                 changed += 1;
             }
             Action::U => {
-                if let Some(v) = ds::get_string(obj, tag) {
+                if ctx.cfg.uids.strategy == UidStrategy::Zero {
+                    if ds::zero(obj, tag) {
+                        changed += 1;
+                    }
+                } else if let Some(v) = ds::get_string(obj, tag) {
                     let mapped: Vec<String> = v.split('\\').map(|u| ctx.uids.map(u)).collect();
                     ds::set_multi_string(obj, tag, mapped);
                     changed += 1;
@@ -219,5 +244,69 @@ mod tests {
         for part in v.split('\\') {
             assert!(part.starts_with("2.25."));
         }
+    }
+
+    #[test]
+    fn uid_strategy_zero_empties_uids() {
+        let cfg = Config::from_toml_str("[uids]\nstrategy = \"zero\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0020, 0x000D),
+            VR::UI,
+            "1.2.3",
+        )]);
+        apply(&mut o, &c).unwrap();
+        let v = crate::deid::dataset::get_string(&o, Tag(0x0020, 0x000D));
+        assert_ne!(v.as_deref(), Some("1.2.3"));
+        assert!(!v.unwrap_or_default().starts_with("2.25."));
+    }
+
+    #[test]
+    fn date_strategy_remove_deletes_date_tag() {
+        let cfg = Config::from_toml_str("[dates]\nstrategy = \"remove\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x0020),
+            VR::DA,
+            "20240101",
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert!(o.element(Tag(0x0008, 0x0020)).is_err());
+    }
+
+    #[test]
+    fn private_tags_removed_by_default_and_kept_with_option() {
+        let mk = |retain: bool| {
+            Config::from_toml_str(&format!(
+                "[dates]\nstrategy = \"zero\"\n[profile]\nretain_safe_private = {retain}\n"
+            ))
+            .unwrap()
+        };
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+
+        let cfg = mk(false);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0009, 0x0010),
+            VR::LO,
+            "VENDOR",
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert!(o.element(Tag(0x0009, 0x0010)).is_err());
+
+        let cfg2 = mk(true);
+        let c2 = ctx(&cfg2, &u, &d);
+        let mut o2 = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0009, 0x0010),
+            VR::LO,
+            "VENDOR",
+        )]);
+        apply(&mut o2, &c2).unwrap();
+        assert!(o2.element(Tag(0x0009, 0x0010)).is_ok());
     }
 }
