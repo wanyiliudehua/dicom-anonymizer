@@ -26,15 +26,40 @@ impl Geometry {
     }
 }
 
-fn write_sample(px: &mut [u8], offset: usize, bytes: usize, fill: u16) {
+/// Write one sample, reporting whether its width is one we can write.
+fn write_sample(px: &mut [u8], offset: usize, bytes: usize, fill: u16) -> bool {
     match bytes {
-        1 => px[offset] = fill.min(255) as u8,
+        1 => {
+            px[offset] = fill.min(255) as u8;
+            true
+        }
         2 => {
             let b = fill.to_le_bytes();
             px[offset] = b[0];
             px[offset + 1] = b[1];
+            true
         }
-        _ => {}
+        // Guarded by `writable_sample_bytes`; reporting `false` keeps the caller's
+        // count honest even if that guard is ever bypassed.
+        _ => false,
+    }
+}
+
+/// The sample width in bytes, or an error naming an unsupported pixel depth.
+///
+/// Only 1- and 2-byte samples can be written. Falling through to "write nothing"
+/// while the caller still counted the sample reported a region as masked when no byte
+/// had been written - which, for burned-in annotation, means shipping the annotation.
+/// So an unsupported depth is refused here, before anything is touched.
+fn writable_sample_bytes(geo: &Geometry) -> Result<usize> {
+    let bps = geo.bytes_per_sample();
+    if matches!(bps, 1 | 2) {
+        Ok(bps)
+    } else {
+        Err(AnonError::Dicom(format!(
+            "cannot mask {} bit samples: only 8 and 16 bit pixel data is supported",
+            geo.bits_allocated
+        )))
     }
 }
 
@@ -67,7 +92,7 @@ pub fn mask_rect_in_place(
     if frame >= geo.frames {
         return Err(AnonError::Dicom(format!("frame {frame} out of range")));
     }
-    let bps = geo.bytes_per_sample();
+    let bps = writable_sample_bytes(geo)?;
     let frame_off = frame as usize * geo.frame_len_bytes();
     let mut written = 0usize;
     for row in y..y + h {
@@ -76,8 +101,9 @@ pub fn mask_rect_in_place(
                 * geo.samples_per_pixel as usize;
             for s in 0..geo.samples_per_pixel as usize {
                 let off = frame_off + (sample0 + s) * bps;
-                write_sample(pixels, off, bps, fill);
-                written += 1;
+                if write_sample(pixels, off, bps, fill) {
+                    written += 1;
+                }
             }
         }
     }
@@ -113,7 +139,7 @@ pub fn mask_polygon_in_place(
     if frame >= geo.frames {
         return Err(AnonError::Dicom(format!("frame {frame} out of range")));
     }
-    let bps = geo.bytes_per_sample();
+    let bps = writable_sample_bytes(geo)?;
     let frame_off = frame as usize * geo.frame_len_bytes();
     let mut written = 0usize;
     for row in 0..geo.rows {
@@ -125,8 +151,9 @@ pub fn mask_polygon_in_place(
                 * geo.samples_per_pixel as usize;
             for s in 0..geo.samples_per_pixel as usize {
                 let off = frame_off + (sample0 + s) * bps;
-                write_sample(pixels, off, bps, fill);
-                written += 1;
+                if write_sample(pixels, off, bps, fill) {
+                    written += 1;
+                }
             }
         }
     }
@@ -219,5 +246,38 @@ mod tests {
         let n = mask_polygon_in_place(&mut px, &geo, 0, &pts, 1).unwrap();
         assert!(n >= 3);
         assert_eq!(px[0], 1); // inside
+    }
+
+    #[test]
+    fn unwritable_sample_widths_are_refused_not_silently_skipped() {
+        // `write_sample` only knows 1- and 2-byte samples. Falling through to "write
+        // nothing" while still counting the sample reports a region as masked when
+        // nothing was masked - the worst outcome for burned-in annotation - so any
+        // other width must be an error on both masking paths.
+        for bits in [0u16, 24, 32] {
+            let geo = Geometry {
+                rows: 2,
+                columns: 2,
+                samples_per_pixel: 1,
+                bits_allocated: bits,
+                frames: 1,
+            };
+            let mut px = vec![0x40u8; 64];
+            let before = px.clone();
+
+            let rect = mask_rect_in_place(&mut px, &geo, 0, 0, 0, 2, 2, 0);
+            assert!(
+                rect.is_err(),
+                "bits_allocated={bits} must be refused: {rect:?}"
+            );
+
+            let poly = mask_polygon_in_place(&mut px, &geo, 0, &[[0i64, 0], [2, 0], [0, 2]], 0);
+            assert!(poly.is_err(), "polygon path too, bits={bits}: {poly:?}");
+
+            assert_eq!(
+                px, before,
+                "bits_allocated={bits} must write nothing at all"
+            );
+        }
     }
 }

@@ -234,12 +234,13 @@ mod tests {
     }
 
     fn build_pixel_obj(
+        bits: u16,
         spp: u16,
         planar: Option<u16>,
     ) -> dicom_object::FileDicomObject<dicom_object::InMemDicomObject> {
         use dicom_core::{DataElement, PrimitiveValue};
         use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
-        let n_bytes = 2 * 2 * spp as usize;
+        let n_bytes = 2 * 2 * spp as usize * (bits as usize).div_ceil(8);
         let mut elems = vec![
             DataElement::new(tags::SOP_CLASS_UID, VR::UI, "1.2.840.10008.5.1.4.1.1.7"),
             DataElement::new(tags::SOP_INSTANCE_UID, VR::UI, "1.2.3.4"),
@@ -252,7 +253,7 @@ mod tests {
             DataElement::new(
                 tags::BITS_ALLOCATED,
                 VR::US,
-                PrimitiveValue::U16(vec![8u16].into()),
+                PrimitiveValue::U16(vec![bits].into()),
             ),
             DataElement::new(
                 tags::SAMPLES_PER_PIXEL,
@@ -278,13 +279,46 @@ mod tests {
     }
 
     #[test]
+    fn unwritable_pixel_depth_is_an_error_not_a_silent_success() {
+        // 32-bit samples cannot be written by the masking code. Reporting a masked
+        // region while leaving the pixels untouched would ship burned-in annotation,
+        // so the file must fail instead of passing quietly.
+        let cfg = Config::from_toml_str(
+            "[pixels]\nmode=\"mask\"\n[[pixels.regions]]\nshape=\"rect\"\n\
+             x=0\ny=0\nwidth=2\nheight=2\n",
+        )
+        .unwrap();
+        let mut file = build_pixel_obj(32, 1, None);
+        let before = file
+            .element(tags::PIXEL_DATA)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            .to_vec();
+
+        let r = process(&mut file, &cfg);
+        assert!(r.is_err(), "32-bit masking must be refused, got {r:?}");
+
+        let after = file
+            .element(tags::PIXEL_DATA)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            .to_vec();
+        assert_eq!(
+            before, after,
+            "nothing may be written when the depth is refused"
+        );
+    }
+
+    #[test]
     fn mask_all_fills_whole_frame_when_burnedin_absent() {
         let cfg = Config::from_toml_str(
             "[pixels]\nmode=\"mask\"\nfill=9\non_missing_burnedin=\"mask_all\"\n\
              [[pixels.regions]]\nshape=\"rect\"\nx=0\ny=0\nwidth=1\nheight=1\n",
         )
         .unwrap();
-        let mut file = build_pixel_obj(1, None);
+        let mut file = build_pixel_obj(8, 1, None);
         let n = process(&mut file, &cfg).unwrap();
         assert_eq!(n.samples_masked, 4);
         assert_eq!(n.regions_masked, 1);
@@ -303,7 +337,7 @@ mod tests {
             "[pixels]\nmode=\"mask\"\n[[pixels.regions]]\nshape=\"rect\"\nwidth=1\nheight=1\n",
         )
         .unwrap();
-        let mut file = build_pixel_obj(3, Some(1));
+        let mut file = build_pixel_obj(8, 3, Some(1));
         assert!(process(&mut file, &cfg).is_err());
     }
 

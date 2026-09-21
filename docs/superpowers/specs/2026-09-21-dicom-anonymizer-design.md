@@ -316,6 +316,7 @@ BurnedInAnnotation (0028,0301) absent? -> warn | skip | mask_all
 transcode to Explicit VR LE when needed (JPEG-LS without `charls` -> Unsupported)
 build Geometry from Rows/Columns/Number of Frames/SamplesPerPixel/BitsAllocated
 reject PlanarConfiguration = 1 (colour-by-plane)
+reject BitsAllocated that is not 8 or 16 (no writable sample width)
 mask rect/polygon regions per frame (or the whole frame for mask_all)
 write PixelData back (OB for ≤8 bits, OW for >8 bits)
 ```
@@ -330,6 +331,10 @@ Returns a `PixelReport { regions_masked, samples_masked }`.
   with `mode = "keep"` the original syntax is preserved.
 - Multi-frame is handled. `PlanarConfiguration = 1` is rejected as a per-file error
   rather than silently mis-masked.
+- Only 8- and 16-bit samples can be masked. Any other `BitsAllocated` (0, 24, 32) is
+  rejected as a per-file error *before* anything is written: `write_sample` cannot write
+  those widths, and a mask that reports success while writing nothing would ship the
+  burned-in annotation it was asked to remove.
 - JPEG-LS (`1.2.840.10008.1.2.4.80/81`) requires the `charls` feature; otherwise the file
   is reported `unsupported` and the batch continues.
 - Default codecs: `native` (RLE, JPEG, Deflate) + `openjp2` (JPEG 2000, pure Rust).
@@ -519,6 +524,9 @@ dicom-anonymizer/
   (default 2 GiB, `0` disables) refuses an oversized input *before reading it* as a
   per-file error; `--jobs 1` bounds the multiplier. There is no streaming reader.
 - **`PlanarConfiguration = 1`** files are rejected when masking is needed.
+- **Only 8- and 16-bit pixel data can be masked.** Other `BitsAllocated` values (0, 24,
+  32) are refused as a per-file error before anything is written, so the run fails loudly
+  instead of claiming a region was masked.
 - **DICOMDIR** is skipped, so media directory indexes are not updated.
 - **Machine-specific build**: this host has no working MinGW `dlltool` and no MSVC
   linker, so the project targets `x86_64-pc-windows-gnullvm` via a `rust-lld` wrapper

@@ -74,6 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Masking silently did nothing on 32-bit pixel data while reporting success.**
+  `geometry::write_sample` handled only 1- and 2-byte samples and fell through to writing
+  nothing, yet both masking paths still incremented `samples_masked`, and `stage.rs` never
+  validated `BitsAllocated`. Measured end-to-end: with `BitsAllocated=32` the run reported
+  `status=ok, regions_masked=1, samples_masked=4` while the pixel bytes came back
+  byte-identical — burned-in annotation shipped alongside an audit trail saying it had been
+  removed. Unsupported widths (0, 24, 32) are now refused as a per-file error before
+  anything is written, and `write_sample` reports whether it wrote, so the count can no
+  longer overstate.
 - **`--verify` scanned rendered pixel data as text, making it ~400x slower than needed.**
   `to_str()` stringifies any primitive, so every file contributed ~871 KB of decimal-rendered
   pixel data to windowed hashing: about 6 s per file, and ~400 s for the 69-file sample tree,

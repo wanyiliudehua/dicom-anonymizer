@@ -217,7 +217,10 @@ unrecognized free-text PHI is not detected. `clean_structured_content` /
 ## Limits
 
 Irreversible by design. JPEG-LS requires `--features charls`. DICOMDIR files
-are skipped. Burned-in masking uses configured regions only; there is no OCR.
+are skipped. Burned-in masking uses configured regions only; there is no OCR. Only 8- and
+16-bit pixel data can be masked: any other `BitsAllocated` is refused as a per-file error
+before anything is written, so the run fails instead of reporting a region as masked that
+was never masked.
 With the default random salts, results are not reproducible across runs; set
 `dates.shift_salt` and `uids.salt` for reproducibility.
 
