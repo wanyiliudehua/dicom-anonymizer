@@ -53,7 +53,8 @@ Intended use: preparing image datasets for research sharing and downstream analy
 - No GUI.
 - No in-place overwrite of source files.
 - No DICOMDIR directory-record rewriting (DICOMDIR files are skipped).
-- No NLP-grade cleaning; the `C`/Clean options are approximated (§10).
+- No NLP-grade cleaning; the `C`/Clean options remove this object's own known
+  identifiers from text, not arbitrary unrecognized PHI (§10).
 
 ## 4. Architecture
 
@@ -208,7 +209,7 @@ Actions:
 | `Z` | Set to zero length |
 | `D` | Replace with a dummy value, VR-aware (`DA`→`19000101`, `DT`→`19000101000000`, `TM`→`000000`, `UI`→new UID, else configured/`ANONYMOUS`) |
 | `U` | Replace with a new UID |
-| `C` | Neutralize the value (approximate "clean"); for temporal attributes under the Modified Dates option, shift instead |
+| `C` | Clean: strip this object's own identifiers (patient/physician name components, IDs, institution words) from the text value and keep the rest; non-text values are neutralized, and temporal attributes under the Modified Dates option are shifted instead |
 | `K` | Keep |
 
 - **Base table:** the full PS3.15 Table E.1-1 (`deid::e1_1::E11`, 653 attributes),
@@ -369,6 +370,7 @@ dicom-anonymizer/
   .cargo/config.toml
   .github/workflows/ci.yml  # fmt + clippy(-D warnings) + test + release build
   .github/workflows/release.yml  # tag `v*` -> prebuilt binaries on a GitHub Release
+  LICENSE  CHANGELOG.md  # MIT license text; Keep a Changelog history
   scripts/
     gen_e1_1.py            # regenerates src/deid/e1_1.rs from the standard
     setup-toolchain.sh      # recreates the local Windows toolchain shim
@@ -389,8 +391,11 @@ dicom-anonymizer/
 
 ## 18. Risks and limitations
 
-- **`C`/Clean options are approximations** — with no NLP, a "clean" attribute is
-  neutralized rather than semantically cleaned; the Modified Dates case shifts instead.
+- **`C`/Clean options are heuristic** — identifiers are harvested from the object
+  itself (name components, patient/accession IDs, institution name/address/department
+  words) and removed from descriptor text case-insensitively, so useful clinical text
+  survives. Unrecognized free-text PHI is not detected, non-text values fall back to
+  neutralization, and the Modified Dates case shifts instead.
 - **JPEG-LS** needs the C-based CharLS when the `charls` feature is enabled. This host
   has no C toolchain, so that feature is unbuildable here.
 - **Lossy JPEG/JPEG 2000 → uncompressed transcode** increases file size; source lossless
@@ -440,6 +445,14 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Date shift** is gated on `retain_longitudinal_temporal`; `D` is VR-aware; dates are
   detected by VR rather than a hard-coded tag list.
 - **Sequence `X`** removes the sequence whole (previously recursion bypassed SQ rules).
+- **Real `C`/Clean semantics**: `C` harvests the object's own identifiers (before any
+  mutation) and scrubs them from descriptor text instead of neutralizing the value.
+  Person names contribute their components; institution-like values also contribute
+  length-filtered words, because descriptors often carry a *substring* of the
+  institution rather than the whole string.
+- **Release packaging**: `Cargo.toml` metadata + `LICENSE` + `CHANGELOG.md`, a
+  `--version` flag, and `.github/workflows/release.yml` (tag `v*` → Linux/Windows/macOS
+  archives attached to a GitHub Release).
 - **Toolchain shim** added for this host (see §18).
 - **`chrono`, `dicom-core`, `dicom-encoding`, `dicom-dictionary-std`** were added as
   direct dependencies; `hex` and `dicom-transfer-syntax-registry`'s `deflate` feature

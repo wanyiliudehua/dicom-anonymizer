@@ -96,10 +96,23 @@ Basic Profile action (options are resolved in table column order; later wins):
 | `clean_structured_content` | Clean Structured Content |
 | `clean_graphics` | Clean Graphics |
 
-`C` (“clean”) in the standard is a content-aware operation; with no NLP this
-tool approximates it by neutralizing the value (and, for the *Modified Dates*
-option, by shifting dates). `clean_structured_content` / `clean_graphics` are
-accepted but only exercised on the attributes E.1-1 marks.
+`C` (“clean”) removes identifiers rather than recognizing arbitrary PHI: before any
+attribute is changed, the file's own identifying strings are harvested — patient-name
+components, patient / other-patient IDs and accession number, the institution
+name/address/department (whole value plus its ≥4-character words), and
+referring / performing / operator names. Those strings are then deleted,
+case-insensitively, from the descriptor text marked `C`, so useful clinical text
+survives:
+
+```
+InstitutionName    WanNan Medical College YiJiShan Hospital   -> (removed)
+StudyDescription   YiJiShan Hospital^l-spine                 -> l-spine
+```
+
+Values whose VR is not textual fall back to neutralization, and temporal attributes
+under the *Modified Dates* option are shifted instead. This is heuristic, not NLP:
+unrecognized free-text PHI is not detected. `clean_structured_content` /
+`clean_graphics` are accepted but only exercised on the attributes E.1-1 marks.
 
 ## Limits
 

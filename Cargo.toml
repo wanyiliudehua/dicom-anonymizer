@@ -2,6 +2,13 @@
 name = "dicom-anonymizer"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.88"
+description = "Bulk DICOM de-identification CLI implementing DICOM PS3.15 Table E.1-1"
+license = "MIT"
+repository = "https://github.com/OWNER/REPO"
+readme = "README.md"
+keywords = ["dicom", "anonymization", "de-identification", "ps3.15", "medical-imaging"]
+categories = ["command-line-utilities", "science"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
