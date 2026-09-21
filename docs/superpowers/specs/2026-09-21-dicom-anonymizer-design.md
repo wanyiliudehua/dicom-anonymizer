@@ -227,6 +227,9 @@ built-in overrides.
 image's clinical/technical parameters. `conservative` overrides demographics
 (`0010,0040` sex, `0010,1010` age, `0010,1020` size, `0010,1030` weight) and all
 date/time attributes to `K` (retain verbatim), while direct identifiers are still cleared.
+The strategy adjusts the **basic** action, not the resolved one, so an explicitly enabled
+option still wins: `conservative` with `retain_longitudinal_temporal` shifts dates instead
+of keeping them.
 
 **Validation:** action codes and tag syntax; `uids.root` when remapping; region
 dimensions; `pixels.fill` named value. Empty `dates.shift_salt` / `uids.salt` mean
@@ -636,6 +639,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Progress reporting** was added beyond the plan: a batch can run for hours, and the
   only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
   a terminal, so redirected output stays byte-identical to before.
+- **An explicitly enabled option now wins over the strategy.** `conservative` used to be
+  applied as an overlay *after* option resolution, so `strategy = "conservative"` with
+  `retain_longitudinal_temporal = true` produced verbatim dates rather than shifted ones -
+  silently choosing the less protective of the two settings. The strategy now adjusts the
+  basic action instead (measured: the date shifts again, `20240115` -> `20170201`).
 - **Unshiftable dates are cleared rather than passed through** (found in review, a
   behaviour change): the old rule let a malformed date survive verbatim and uncounted,
   which broke the Modified Dates option's promise for exactly the inputs it could not

@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An explicitly enabled option was silently overridden by `conservative`.** The strategy
+  was applied as an overlay after option resolution, so `strategy = "conservative"` with
+  `retain_longitudinal_temporal = true` kept dates **verbatim** instead of shifting them:
+  the user's explicit, more protective choice lost without a word. The strategy now adjusts
+  the basic action before options are resolved, so options win as they do in every other
+  case. Behaviour change for that combination only; measured transition from verbatim to
+  shifted (`20240115` -> `20170201`).
 - **`[dates] range_days` was unvalidated and overflowed.** `offset_for` computes
   `2 * range_days + 1`, so `range_days = 9223372036854775807` panicked with "attempt to
   multiply with overflow" in a debug build (exit 101) and wrapped silently in release.

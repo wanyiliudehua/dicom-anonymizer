@@ -80,10 +80,26 @@ fn resolve(basic: Action, opts: &[(&str, Action)], cfg: &Config) -> Action {
 
 /// The full E.1-1 table (with option resolution) plus the pinned overrides.
 pub fn base_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     let mut map: BTreeMap<Tag, Action> = BTreeMap::new();
+    let conservative = cfg.profile.strategy == Strategy::Conservative;
+    let mut retain: BTreeSet<Tag> = BTreeSet::new();
+    if conservative {
+        for t in CONSERVATIVE_RETAIN {
+            retain.insert(parse_tag(t)?);
+        }
+    }
     for (tag, basic, opts) in E11 {
-        map.insert(parse_tag(tag)?, resolve(*basic, opts, cfg));
+        let t = parse_tag(tag)?;
+        // The strategy adjusts the *basic* action rather than overwriting the resolved one,
+        // so an explicitly enabled option still wins over it. Overwriting afterwards meant a
+        // user who asked for shifted dates silently got verbatim dates instead.
+        let base = if conservative && retain.contains(&t) {
+            Action::K
+        } else {
+            *basic
+        };
+        map.insert(t, resolve(base, opts, cfg));
     }
     for (t, a) in OVERRIDES {
         map.insert(parse_tag(t)?, *a);
@@ -91,16 +107,10 @@ pub fn base_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
     Ok(map.into_iter().collect())
 }
 
-/// Base rules with the strategy overlay and user `[tags]` overrides applied.
+/// Base rules with the user `[tags]` overrides applied.
 pub fn effective_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
     use std::collections::BTreeMap;
     let mut map: BTreeMap<Tag, Action> = base_rules(cfg)?.into_iter().collect();
-    // Conservative: retain demographics and dates/times verbatim.
-    if cfg.profile.strategy == Strategy::Conservative {
-        for t in CONSERVATIVE_RETAIN {
-            map.insert(parse_tag(t)?, Action::K);
-        }
-    }
     // User overrides win over everything.
     for (k, v) in &cfg.tags {
         map.insert(parse_tag(k)?, *v);
@@ -274,6 +284,36 @@ mod tests {
         assert_ne!(m[&parse_tag("0010,1010").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0020").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0032").unwrap()], Action::K);
+    }
+
+    #[test]
+    fn an_explicit_date_option_beats_the_conservative_default() {
+        // The strategy supplies the *default* action, so an explicitly enabled option must
+        // still win. Otherwise a user who asks for shifted dates silently gets verbatim
+        // dates - the less protective of the two choices - just because the strategy also
+        // has something to say about dates.
+        use crate::config::parse_tag;
+        let both = Config::from_toml_str(
+            "[profile]\nstrategy = \"conservative\"\nretain_longitudinal_temporal = true\n",
+        )
+        .unwrap();
+        assert_eq!(
+            rule_map(&both)[&parse_tag("0008,0020").unwrap()],
+            Action::C,
+            "the Modified Dates option must still shift"
+        );
+
+        // The conservative default is unchanged when no option speaks.
+        let alone = Config::from_toml_str("[profile]\nstrategy = \"conservative\"\n").unwrap();
+        assert_eq!(
+            rule_map(&alone)[&parse_tag("0008,0020").unwrap()],
+            Action::K
+        );
+        assert_eq!(
+            rule_map(&alone)[&parse_tag("0010,0040").unwrap()],
+            Action::K,
+            "demographics are still retained"
+        );
     }
 
     #[test]

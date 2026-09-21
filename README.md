@@ -41,7 +41,9 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
   attribute and keeps only the image's own clinical parameters.
   **conservative** clears the direct identifiers (name, ID, birth date,
   accession number, institution, device serial, physician names, ...) but
-  retains patient demographics (sex, age, size, weight) and all dates/times.
+  retains patient demographics (sex, age, size, weight) and all dates/times. An explicitly
+  enabled option still wins over the strategy: `conservative` together with
+  `retain_longitudinal_temporal` shifts dates rather than keeping them.
 - `--jobs N`: process files in parallel with N threads. Progress is reported on stderr
   when stderr is a terminal, or always with `--verbose`: a line every couple of seconds
   giving the count, throughput and ETA, plus a final line when the batch finishes. Piped
