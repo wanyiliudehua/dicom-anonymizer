@@ -241,8 +241,9 @@ harvesting a 2-character ASCII token such as `Li` would tear `Ligament` apart.
 - **Scrub:** matching is Unicode-aware (`char::to_lowercase`, not byte folding) and
 case-insensitive; the needle keeps its original character count so the removed range
 is always the length of the source text it replaced. If nothing matches, the value is
-returned **byte for byte** instead of being normalized. After a removal, runs of
-whitespace are collapsed and leading/trailing `^` trimmed.
+returned **byte for byte** instead of being normalized. After a removal, only
+leading/trailing ASCII spaces and `^` are trimmed; nothing else is rewritten, because
+collapsing Unicode whitespace corrupts bytes (§18).
 - **Character sets:** text is decoded/encoded through the dataset's
 `SpecificCharacterSet`, which is itself never modified (it is not in E.1-1), so a
 UTF-8 (`ISO_IR 192`) file stays readable and its non-ASCII identifiers are still
@@ -453,11 +454,11 @@ dicom-anonymizer/
   codec, the file is still processed (verified: `status = ok`) and still cleaned, and
   accented non-ASCII text under such a fallback is verified to stay readable with the
   identifier still removed.
-- **A file may be un-anonymisable.** Confirmed by test: writing non-ASCII text while the
-  file declares no `SpecificCharacterSet` fails outright, because the default character
-  set is ASCII-equivalent and cannot encode CJK. The pipeline turns that into a per-file
-  `error` (no output written, temp file removed, batch continues). Safe, but the file is
-  left un-anonymised, so the audit must be read rather than trusting the batch exit code.
+- **Undeclared character sets are passed through, not repaired.** Text in a file with no
+  `SpecificCharacterSet` is decoded single-byte (byte 0x85 becomes U+0085, not a UTF-8
+  character) and written back through the same codec, which reproduces the original bytes
+  exactly (verified by test on a hand-built fixture). Cleaning runs on that same decoding
+  so it still matches, but the output stays exactly as ambiguous as the input.
 - **`PlanarConfiguration = 1`** files are rejected when masking is needed.
 - **DICOMDIR** is skipped, so media directory indexes are not updated.
 - **Machine-specific build**: this host has no working MinGW `dlltool` and no MSVC
@@ -526,6 +527,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   or institution survived untouched. Matching is now Unicode-aware over `char`s with a
   script-aware length floor. Note this was latent for the sample dataset, which declares
   `ISO_IR 100` and has non-ASCII bytes only in binary VRs (US/OB and private tags).
+- **The `C` clean action could corrupt text, and whitespace handling was narrowed once a
+  real corruption was found.** The fixture for undeclared character sets (hand-built
+  bytes, because the writer refuses to produce one) showed byte 0x85 silently becoming a
+  space: `split_whitespace` counts NEL (U+0085) and NBSP as whitespace, and those are
+  exactly what undeclared single-byte text decodes to. `C` now trims only leading/trailing
+  ASCII spaces and `^` and rewrites nothing else.
 - **`--verify` / `--export-identifiers`** were added beyond the plan, completing
   `--check-leaks` into a workflow that works without the originals. The exported artefact
   is deliberately a salted hash set rather than a plaintext identifier list, so the tool

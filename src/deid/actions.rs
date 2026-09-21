@@ -169,13 +169,15 @@ fn scrub(text: &str, ids: &[String]) -> String {
         // rather than normalizing whitespace we were not asked to touch.
         return text.to_string();
     }
+    // Tidy only the separators a removal can expose. Collapsing whitespace with
+    // `split_whitespace` would rewrite every character Rust calls whitespace, and
+    // that set includes NEL (U+0085) and NBSP - which is exactly what undeclared
+    // single-byte text decodes to. Doing so silently turns those bytes into spaces
+    // and corrupts text the clean action was never asked to touch.
     chars
         .iter()
         .collect::<String>()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .trim_matches(|c| c == '^' || c == ' ')
+        .trim_matches(|c| c == ' ' || c == '^' || c == '\t')
         .to_string()
 }
 
@@ -749,6 +751,30 @@ mod tests {
         assert_eq!(
             crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
             Some("Ligament tear")
+        );
+    }
+
+    #[test]
+    fn clean_does_not_rewrite_characters_rust_calls_whitespace() {
+        // Text that declares no character set is decoded byte-wise, so byte 0x85
+        // becomes NEL (U+0085) - which `char::is_whitespace` accepts. Collapsing
+        // whitespace would rewrite that byte into a space, corrupting the value.
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(Tag(0x0010, 0x0010), VR::PN, "Doe"),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "Doe\u{85}x\u{a0}y"),
+        ]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("\u{85}x\u{a0}y"),
+            "NEL/NBSP must survive a clean untouched"
         );
     }
 }

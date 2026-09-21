@@ -169,9 +169,8 @@ are skipped. Burned-in masking uses configured regions only; there is no OCR.
 With the default random salts, results are not reproducible across runs; set
 `dates.shift_salt` and `uids.salt` for reproducibility.
 
-A source file that carries non-ASCII text but declares **no** `SpecificCharacterSet`
-cannot be written back: DICOM's default character set is ASCII-equivalent, so encoding
-CJK or accented text fails. Such a file is audited as `error` and no output is written
-(the batch continues). That is a safe failure, not a leak — but it does mean the file is
-not anonymised, so fix the source by declaring `ISO_IR 192`, `GB18030`, `GBK` or
-`ISO 2022 IR 58` as appropriate.
+A source file that carries non-ASCII text while declaring **no** `SpecificCharacterSet`
+is not conformant, but it is handled rather than rejected: the bytes are decoded
+single-byte and re-encoded the same way, so the text survives byte-for-byte (verified by
+test) and cleaning runs on that same decoding. The caveat is that the encoding stays
+ambiguous — declare the character set at the source if you control it.

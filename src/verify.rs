@@ -513,10 +513,12 @@ mod tests {
 
     #[test]
     fn the_library_rejects_non_ascii_text_without_a_character_set() {
-        // Discovered while writing the tests above: the default character set is
-        // ASCII-equivalent, so CJK text cannot be encoded at all and the file
-        // fails to write. That is why a source file may be un-anonymizable, and
-        // it is why the pipeline must surface the failure rather than pretend.
+        // Constructing a value with real CJK characters and writing it under the
+        // default (ASCII-equivalent) codec fails. Note this is NOT what reading a
+        // file does: bytes read from disk decode to single-byte characters that the
+        // same codec re-encodes byte-for-byte, so the pipeline never meets this. It
+        // is kept to pin the bytes-versus-characters distinction that caused a
+        // wrong inference once already.
         let d = tempfile::tempdir().unwrap();
         let [a, b] = sop();
         let obj = InMemDicomObject::from_element_iter([

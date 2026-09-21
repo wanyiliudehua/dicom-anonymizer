@@ -27,8 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Tests
 
 - A file that declares **no** `SpecificCharacterSet` while carrying non-ASCII text is
-  confirmed to be unwritable (the default character set cannot encode CJK), which the
-  pipeline surfaces as a per-file `error` rather than a silent corrupt write.
+  verified to round-trip **byte-for-byte** and still be cleaned, using a fixture built
+  from hand-written bytes because the writer refuses to produce one. An earlier claim
+  that such files cannot be written back was wrong and has been corrected here and in
+  the README.
 - Character-set coverage: `ISO_IR 192`, `GB18030`, `GBK` and `ISO 2022 IR 58` are
   verified to round-trip through real file IO with identifiers still scrubbed, and an
   unsupported code (`ISO 2022 IR 148`) is verified to be processed and cleaned rather
@@ -37,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `C` clean action could corrupt text.** After removing an identifier it collapsed
+  whitespace with `split_whitespace`, which counts NEL (U+0085) and NBSP as whitespace -
+  and those are what undeclared single-byte text decodes to, so byte 0x85 silently became
+  a space. `C` now trims only leading/trailing ASCII spaces and `^`, and rewrites nothing
+  else.
 - `--check-leaks` now sees **non-ASCII** text. Like the scrub before it, the scan skipped
   any value containing a non-ASCII byte, so a CJK identifier left in an output was
   invisible to it.

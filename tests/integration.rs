@@ -504,6 +504,57 @@ fn verify_rejects_a_file_that_is_not_a_fingerprint() {
 }
 
 #[test]
+fn text_without_a_declared_character_set_round_trips_and_is_still_cleaned() {
+    // A file carrying UTF-8 text while declaring no SpecificCharacterSet is not
+    // conformant, yet such files exist in the wild. Reading maps those bytes to
+    // Latin-1-ish characters, which the same codec can write back, so the bytes
+    // survive untouched - and cleaning runs on that same decoding, so it still
+    // matches. (Constructing such a value in memory instead would be rejected by
+    // the writer, which is what made this look like a hard failure at first.)
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_raw_cjk_fixture(&src.path().join("one.dcm"));
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(
+        &cfg_path,
+        "[output]\nfilename = \"preserve\"\n[profile]\nclean_descriptors = true\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"ok\""), "{audit}");
+
+    let written = std::fs::read(out.path().join("one.dcm")).unwrap();
+    let contains = |needle: &[u8]| written.windows(needle.len()).any(|w| w == needle);
+    // The patient name's bytes are gone outright.
+    assert!(
+        !contains("程英平".as_bytes()),
+        "patient name bytes survived"
+    );
+    // The institution's bytes are gone from both the attribute and the
+    // descriptor that repeated them.
+    assert!(
+        !contains("万楠医学院附属医院".as_bytes()),
+        "institution bytes survived"
+    );
+    // Clinical text is preserved byte for byte.
+    assert!(contains("腰椎".as_bytes()), "clinical text was lost");
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();
