@@ -140,6 +140,13 @@ dicom-anonymizer \
 - `--fail-fast`: abort on the first per-file error.
 - `--verbose`: extra progress on stderr.
 - `--version` / `--help`: standard clap output.
+- `--export-identifiers <FILE>`: additionally write a salted, hashed fingerprint of the
+  input tree's identifiers (see `verify`).
+- `--verify <FILE>`: a separate mode. Scan `--input` against a fingerprint and report
+  any surviving identifier; `--config` and `--output` are not required and not used, so
+  a delivered tree can be audited without the originals or the original settings.
+- `--output` is therefore optional at the clap level and validated manually: required in
+  the default (anonymise) mode, unused by `--verify`.
 
 ## 7. Configuration
 
@@ -357,8 +364,10 @@ One object per walked file:
 - A file needing a transfer syntax it cannot decode is `unsupported`, not `error`.
 - Audit-write failures are surfaced and make the run exit `1`.
 - A `--check-leaks` hit is reported on stderr and makes the run exit `1`.
+- `--verify` exits `0` when nothing matched and `1` when any identifier survived; bad
+  arguments or an unreadable/invalid fingerprint file exit `2`.
 - Exit codes: `0` all files succeeded/skipped; `1` ≥1 error, audit-write failure, or
-  leak-check hit; `2` fatal (bad args, unreadable config, missing input directory).
+  leak/verify hit; `2` fatal (bad args, unreadable config, missing input directory).
 - A final summary is printed to stderr.
 
 ## 14. Concurrency
@@ -444,6 +453,11 @@ dicom-anonymizer/
   codec, the file is still processed (verified: `status = ok`) and still cleaned, and
   accented non-ASCII text under such a fallback is verified to stay readable with the
   identifier still removed.
+- **A file may be un-anonymisable.** Confirmed by test: writing non-ASCII text while the
+  file declares no `SpecificCharacterSet` fails outright, because the default character
+  set is ASCII-equivalent and cannot encode CJK. The pipeline turns that into a per-file
+  `error` (no output written, temp file removed, batch continues). Safe, but the file is
+  left un-anonymised, so the audit must be read rather than trusting the batch exit code.
 - **`PlanarConfiguration = 1`** files are rejected when masking is needed.
 - **DICOMDIR** is skipped, so media directory indexes are not updated.
 - **Machine-specific build**: this host has no working MinGW `dlltool` and no MSVC
@@ -512,6 +526,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   or institution survived untouched. Matching is now Unicode-aware over `char`s with a
   script-aware length floor. Note this was latent for the sample dataset, which declares
   `ISO_IR 100` and has non-ASCII bytes only in binary VRs (US/OB and private tags).
+- **`--verify` / `--export-identifiers`** were added beyond the plan, completing
+  `--check-leaks` into a workflow that works without the originals. The exported artefact
+  is deliberately a salted hash set rather than a plaintext identifier list, so the tool
+  does not create a new PHI file to verify its own de-identification. Refactoring the scan
+  to share a `for_each_text_value` walk also fixed `--check-leaks`, which had skipped any
+  value containing a non-ASCII byte and therefore could not see a CJK leak at all.
 - **Character-set support was verified, not assumed.** Tests pin `ISO_IR 192`, `GB18030`,
   `GBK` and `ISO 2022 IR 58` round-tripping through real file IO, plus an unsupported
   code (`ISO 2022 IR 148`) which the crate handles by falling back rather than failing -

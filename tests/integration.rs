@@ -427,6 +427,83 @@ fn non_ascii_text_under_an_unsupported_character_set_is_still_cleaned() {
 }
 
 #[test]
+fn exported_fingerprint_verifies_a_tree_without_the_originals() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture_extra(
+        &src.path().join("one.dcm"),
+        "Doe^John",
+        "1.2.3",
+        &[(
+            Tag(0x0008, 0x0080),
+            VR::LO,
+            "WanNan Medical College YiJiShan Hospital",
+        )],
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+    assert!(fp.exists());
+
+    // The artefact is a verification aid, not a new PHI file.
+    let json = std::fs::read_to_string(&fp).unwrap();
+    assert!(!json.contains("Doe"), "{json}");
+    assert!(!json.contains("John"), "{json}");
+    assert!(!json.contains("YiJiShan"), "{json}");
+
+    // The anonymised tree verifies clean, needing only the fingerprint.
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(out.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("verify: 0 hit(s)"));
+
+    // The un-anonymised source is caught, so the check discriminates.
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("leak:"));
+}
+
+#[test]
+fn verify_rejects_a_file_that_is_not_a_fingerprint() {
+    let src = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let dir = tempfile::tempdir().unwrap();
+    let bad = dir.path().join("bad.json");
+    std::fs::write(&bad, "this is not a fingerprint").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["--verify"])
+        .arg(&bad)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is not a fingerprint"));
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

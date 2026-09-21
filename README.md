@@ -27,7 +27,11 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
 ## Usage
 
     dicom-anonymizer --input ./in --output ./out [--config config.toml] \
-      [--jobs N] [--dry-run] [--check-leaks] [--fail-fast] [--verbose]
+      [--jobs N] [--dry-run] [--check-leaks] [--export-identifiers FILE] \
+      [--fail-fast] [--verbose]
+
+    # later, with no need for the originals:
+    dicom-anonymizer --input ./out --verify fingerprint.json
 
 - `--input` / `--output`: DICOM source tree and a separate output tree
   (inputs are never modified).
@@ -45,6 +49,26 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
   accession number, institution name/address/department words) and scanning every
   output value for them. Any hit is printed and the run exits `1`, so an attribute the
   profile was told to retain cannot silently carry a name through.
+- `--export-identifiers FILE`: also write a **salted fingerprint** of the input tree's
+  identifiers, so the result can be re-verified later (see below).
+- `--verify FILE`: scan `--input` against a fingerprint *instead of* anonymizing. Needs
+  neither `--config` nor `--output`; prints every hit with its file, tag and offending
+  text, and exits `1` if anything survived.
+
+### Verifying later
+
+A run can record what was identifying, so a delivered tree can be audited afterwards
+without the originals:
+
+    dicom-anonymizer -i ./in  -o ./out --export-identifiers ids.json   # during the run
+    dicom-anonymizer -i ./out --verify ids.json                        # later, anywhere
+
+`ids.json` contains only salted SHA-256 hashes plus the identifier lengths — never a
+name. A tool whose whole job is removing identifiers should not answer by writing a new
+plaintext list of patients. The salt sits beside the hashes so they can be recomputed,
+which makes the file a *derived* artefact that still deserves care (common names can be
+brute-forced out of hashes). Hits are reported with the offending substring, so
+`--verify` doubles as a triage tool on a tree you did not produce.
 
 See `dicom-anonymizer.example.toml` for all options.
 
@@ -144,3 +168,10 @@ Irreversible by design. JPEG-LS requires `--features charls`. DICOMDIR files
 are skipped. Burned-in masking uses configured regions only; there is no OCR.
 With the default random salts, results are not reproducible across runs; set
 `dates.shift_salt` and `uids.salt` for reproducibility.
+
+A source file that carries non-ASCII text but declares **no** `SpecificCharacterSet`
+cannot be written back: DICOM's default character set is ASCII-equivalent, so encoding
+CJK or accented text fails. Such a file is audited as `error` and no output is written
+(the batch continues). That is a safe failure, not a leak — but it does mean the file is
+not anonymised, so fix the source by declaring `ISO_IR 192`, `GB18030`, `GBK` or
+`ISO 2022 IR 58` as appropriate.

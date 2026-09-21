@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--export-identifiers FILE` and `--verify FILE`: record what was identifying as a
+  **salted fingerprint** (hashes plus lengths, never a name) while anonymising, then later
+  verify a tree against it with no need for the original data, config or output tree.
+  Hits are reported with the offending substring; `--output` is not required by
+  `--verify`.
 - `[output] layout = "series"`: flatten the output tree into one directory per
   (remapped) Series Instance UID. Directory names are sanitized for path safety and a
   file with no usable series UID keeps its mirrored path instead of being dropped.
@@ -21,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- A file that declares **no** `SpecificCharacterSet` while carrying non-ASCII text is
+  confirmed to be unwritable (the default character set cannot encode CJK), which the
+  pipeline surfaces as a per-file `error` rather than a silent corrupt write.
 - Character-set coverage: `ISO_IR 192`, `GB18030`, `GBK` and `ISO 2022 IR 58` are
   verified to round-trip through real file IO with identifiers still scrubbed, and an
   unsupported code (`ISO 2022 IR 148`) is verified to be processed and cleaned rather
@@ -29,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check-leaks` now sees **non-ASCII** text. Like the scrub before it, the scan skipped
+  any value containing a non-ASCII byte, so a CJK identifier left in an output was
+  invisible to it.
 - The `C` clean action no longer normalizes whitespace in a text value when it removed
   nothing, matching the documented "no identifier present → unchanged" behaviour.
 - The `C` clean action now handles **non-ASCII** identifiers. It previously skipped any

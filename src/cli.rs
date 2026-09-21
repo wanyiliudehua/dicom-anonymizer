@@ -13,9 +13,10 @@ pub struct Args {
     /// Input directory tree containing DICOM files.
     #[arg(short, long)]
     pub input: PathBuf,
-    /// Output directory (created if needed); inputs are never modified.
+    /// Output directory (created if needed); inputs are never modified. Required
+    /// unless `--verify` is used.
     #[arg(short, long)]
-    pub output: PathBuf,
+    pub output: Option<PathBuf>,
     /// TOML config file; defaults to the built-in `ps3.15-basic` preset.
     #[arg(short, long)]
     pub config: Option<PathBuf>,
@@ -32,6 +33,14 @@ pub struct Args {
     /// survives in the output tree (exits 1 on any hit).
     #[arg(long, default_value_t = false)]
     pub check_leaks: bool,
+    /// Write a salted fingerprint of the identifiers found in the input tree to
+    /// FILE, so the run can be re-verified later without the original data.
+    #[arg(long, value_name = "FILE")]
+    pub export_identifiers: Option<PathBuf>,
+    /// Verify `--input` against a fingerprint written by `--export-identifiers`
+    /// instead of anonymizing; exits 1 if anything survived.
+    #[arg(long, value_name = "FILE")]
+    pub verify: Option<PathBuf>,
     /// Stop at the first per-file error.
     #[arg(long, default_value_t = false)]
     pub fail_fast: bool,
@@ -50,8 +59,31 @@ mod tests {
         let a =
             Args::try_parse_from(["dicom-anonymizer", "--input", "in", "--output", "out"]).unwrap();
         assert_eq!(a.input.to_string_lossy(), "in");
-        assert_eq!(a.output.to_string_lossy(), "out");
+        assert_eq!(a.output.as_deref().unwrap().to_string_lossy(), "out");
         assert!(!a.dry_run);
+    }
+
+    #[test]
+    fn output_is_optional_so_verification_can_stand_alone() {
+        let a = Args::try_parse_from(["x", "-i", "in", "--verify", "fp.json"]).unwrap();
+        assert!(a.output.is_none());
+        assert_eq!(a.verify.as_deref().unwrap().to_string_lossy(), "fp.json");
+    }
+
+    #[test]
+    fn export_identifiers_parses() {
+        let a = Args::try_parse_from([
+            "x",
+            "-i",
+            "in",
+            "-o",
+            "out",
+            "--export-identifiers",
+            "fp.json",
+        ])
+        .unwrap();
+        assert!(a.export_identifiers.is_some());
+        assert!(a.verify.is_none());
     }
 
     #[test]

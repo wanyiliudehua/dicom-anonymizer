@@ -21,6 +21,17 @@ fn main() {
 fn run() -> i32 {
     let args = cli::Args::parse();
 
+    // Verification is a separate, config-free mode: a fingerprint already records
+    // what was identifying when it was exported.
+    if let Some(path) = args.verify.clone() {
+        return run_verify(&args.input, &path);
+    }
+
+    let Some(output) = args.output.clone() else {
+        eprintln!("error: --output is required (unless --verify is used)");
+        return 2;
+    };
+
     let mut cfg = match &args.config {
         Some(p) => match config::Config::load(p) {
             Ok(c) => c,
@@ -47,7 +58,7 @@ fn run() -> i32 {
         eprintln!("error: input `{}` is not a directory", args.input.display());
         return 2;
     }
-    if let Err(e) = std::fs::create_dir_all(&args.output) {
+    if let Err(e) = std::fs::create_dir_all(&output) {
         eprintln!("error: cannot create output dir: {e}");
         return 2;
     }
@@ -67,7 +78,7 @@ fn run() -> i32 {
         uids: deid::uids::UidMapper::new(&cfg.uids.root, &uid_salt),
         dates: deid::dates::DateShifter::new(&date_salt, cfg.dates.range_days),
         cfg,
-        out_root: args.output.clone(),
+        out_root: output.clone(),
         dry_run: args.dry_run,
     };
 
@@ -79,11 +90,20 @@ fn run() -> i32 {
         }
     };
 
+    // Optional: record what was identifying, as salted hashes, so this run can be
+    // re-verified later without the originals and without storing PHI again.
+    if let Some(path) = &args.export_identifiers {
+        if let Err(e) = export_fingerprint(&args.input, &shared.cfg, path) {
+            eprintln!("error: cannot export identifiers: {e}");
+            return 2;
+        }
+    }
+
     // Audit sink: stdout in dry-run, otherwise <output>/audit.jsonl.
     let audit_file = if args.dry_run {
         None
     } else {
-        let path = args.output.join("audit.jsonl");
+        let path = output.join("audit.jsonl");
         match std::fs::File::create(&path) {
             Ok(f) => Some(f),
             Err(e) => {
@@ -171,7 +191,7 @@ fn run() -> i32 {
             eprintln!(
                 "note: --check-leaks needs an output tree, and --dry-run writes none; skipping"
             );
-        } else if !check_leaks(&args.input, &args.output, &shared.cfg) {
+        } else if !check_leaks(&args.input, &output, &shared.cfg) {
             return 1;
         }
     }
@@ -217,4 +237,75 @@ fn random_salt() -> Vec<u8> {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("{nanos}-{}", std::process::id()).into_bytes()
+}
+
+/// Salt for a fingerprint: random per export, so one artefact cannot be compared
+/// against another run's.
+fn random_salt_str() -> String {
+    String::from_utf8_lossy(&random_salt()).into_owned()
+}
+
+/// Write the identifiers of `input` as salted hashes.
+fn export_fingerprint(
+    input: &std::path::Path,
+    cfg: &config::Config,
+    path: &std::path::Path,
+) -> Result<(), String> {
+    let harvested = verify::harvest(input).map_err(|e| e.to_string())?;
+    let ids = verify::check_set(&harvested, cfg);
+    let fp = verify::fingerprint(&ids, &random_salt_str());
+    let json = serde_json::to_string_pretty(&fp).map_err(|e| e.to_string())?;
+    std::fs::write(path, json).map_err(|e| e.to_string())?;
+    eprintln!(
+        "exported {} identifier fingerprint(s) to {}",
+        fp.hashes.len(),
+        path.display()
+    );
+    Ok(())
+}
+
+/// Scan `input` against a fingerprint and report anything that survived.
+fn run_verify(input: &std::path::Path, path: &std::path::Path) -> i32 {
+    if !input.is_dir() {
+        eprintln!("error: input `{}` is not a directory", input.display());
+        return 2;
+    }
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: cannot read fingerprint {}: {e}", path.display());
+            return 2;
+        }
+    };
+    let fp: verify::Fingerprint = match serde_json::from_str(&text) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("error: {} is not a fingerprint: {e}", path.display());
+            return 2;
+        }
+    };
+    let hits = match verify::scan_fingerprint(input, &fp) {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("error: cannot scan {}: {e}", input.display());
+            return 2;
+        }
+    };
+    for h in &hits {
+        eprintln!(
+            "leak: {} ({:04X},{:04X}) contains `{}`",
+            h.file, h.tag.0, h.tag.1, h.matched
+        );
+    }
+    eprintln!(
+        "verify: {} hit(s) using {} fingerprint(s) over {}",
+        hits.len(),
+        fp.hashes.len(),
+        input.display()
+    );
+    if hits.is_empty() {
+        0
+    } else {
+        1
+    }
 }
