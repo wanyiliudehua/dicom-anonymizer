@@ -31,6 +31,11 @@ fn end_to_end_mirrors_tree_and_deidentifies() {
     assert!(!out.path().join("b/notes.txt").exists());
     assert!(out.path().join("audit.jsonl").exists());
 
+    // the non-DICOM file is logged as skipped (spec §11)
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"skipped\""), "missing skipped record");
+    assert!(audit.contains("notes.txt"), "skipped record should name the file");
+
     let o1 = dicom_object::open_file(out.path().join("a/one.dcm")).unwrap();
     let n1 = o1
         .element(dicom_dictionary_std::tags::PATIENT_NAME)

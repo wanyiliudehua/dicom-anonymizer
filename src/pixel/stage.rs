@@ -49,27 +49,49 @@ fn get_u16(obj: &InMemDicomObject, t: Tag) -> Option<u16> {
     obj.element(t).ok().and_then(|e| e.to_int::<u16>().ok())
 }
 
+/// What the pixel stage did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PixelReport {
+    /// Number of mask operations applied (configured regions, or one for the
+    /// whole-frame `mask_all` fallback).
+    pub regions_masked: usize,
+    /// Number of individual samples written.
+    pub samples_masked: usize,
+}
+
+/// JPEG-LS transfer syntaxes need the optional `charls` feature.
+fn unsupported_without_feature(uid: &str) -> bool {
+    #[cfg(feature = "charls")]
+    {
+        let _ = uid;
+        false
+    }
+    #[cfg(not(feature = "charls"))]
+    {
+        matches!(uid, "1.2.840.10008.1.2.4.80" | "1.2.840.10008.1.2.4.81")
+    }
+}
+
 /// Transcode to uncompressed, mask configured regions, write pixels back.
-/// Returns the number of masked samples (0 when no region applies).
-pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Result<usize> {
+pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Result<PixelReport> {
     if cfg.pixels.mode == PixelMode::Keep {
-        return Ok(0);
+        return Ok(PixelReport::default());
     }
     let modality = ds::get_string(obj, tags::MODALITY);
     let sop = ds::get_string(obj, tags::SOP_CLASS_UID);
     let selected = select(cfg, modality.as_deref(), sop.as_deref());
     if selected.is_empty() {
-        return Ok(0);
+        return Ok(PixelReport::default());
     }
 
     // No pixel data (e.g. SR): nothing to mask and nothing to transcode.
     if obj.element(tags::PIXEL_DATA).is_err() {
-        return Ok(0);
+        return Ok(PixelReport::default());
     }
 
     let burned = ds::get_string(obj, tags::BURNED_IN_ANNOTATION);
     let mask_all = match (burned.is_none(), &cfg.pixels.on_missing_burnedin) {
-        (true, OnMissing::Skip) => return Ok(0),
+        (true, OnMissing::Skip) => return Ok(PixelReport::default()),
         (true, OnMissing::MaskAll) => true,
         (true, OnMissing::Warn) => {
             eprintln!(
@@ -83,6 +105,9 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
     // Decompress to Explicit VR LE if the source uses another transfer syntax.
     let ts_uid = obj.meta().transfer_syntax().to_string();
     if ts_uid != "1.2.840.10008.1.2.1" {
+        if unsupported_without_feature(&ts_uid) {
+            return Err(AnonError::Unsupported(ts_uid));
+        }
         let ts = dicom_transfer_syntax_registry::entries::EXPLICIT_VR_LITTLE_ENDIAN.erased();
         obj.transcode_with_options(&ts, dicom_encoding::adapters::EncodeOptions::default())
             .map_err(|e| AnonError::Dicom(format!("transcode failed: {e}")))?;
@@ -125,26 +150,22 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
         )));
     }
 
-    let mut masked = 0usize;
+    let mut samples_masked = 0usize;
+    let mut regions_masked = 0usize;
     if mask_all {
         for frame in 0..geo.frames {
-            masked += mask_rect_in_place(
-                &mut pixels,
-                &geo,
-                frame,
-                0,
-                0,
-                geo.columns,
-                geo.rows,
-                fill,
+            samples_masked += mask_rect_in_place(
+                &mut pixels, &geo, frame, 0, 0, geo.columns, geo.rows, fill,
             )?;
         }
+        regions_masked = 1;
     } else {
         for region in selected {
+            let before = samples_masked;
             for frame in frames_for(region, geo.frames) {
                 match region.shape {
                     Shape::Rect => {
-                        masked += mask_rect_in_place(
+                        samples_masked += mask_rect_in_place(
                             &mut pixels,
                             &geo,
                             frame,
@@ -156,10 +177,14 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
                         )?;
                     }
                     Shape::Polygon => {
-                        masked +=
-                            mask_polygon_in_place(&mut pixels, &geo, frame, &region.points, fill)?;
+                        samples_masked += mask_polygon_in_place(
+                            &mut pixels, &geo, frame, &region.points, fill,
+                        )?;
                     }
                 }
+            }
+            if samples_masked > before {
+                regions_masked += 1;
             }
         }
     }
@@ -174,7 +199,10 @@ pub fn process(obj: &mut FileDicomObject<InMemDicomObject>, cfg: &Config) -> Res
         DataElement::new(tags::PIXEL_DATA, VR::OB, PrimitiveValue::U8(pixels.into()))
     };
     obj.put_element(elem);
-    Ok(masked)
+    Ok(PixelReport {
+        regions_masked,
+        samples_masked,
+    })
 }
 
 #[cfg(test)]
@@ -254,7 +282,8 @@ mod tests {
         .unwrap();
         let mut file = build_pixel_obj(1, None);
         let n = process(&mut file, &cfg).unwrap();
-        assert_eq!(n, 4);
+        assert_eq!(n.samples_masked, 4);
+        assert_eq!(n.regions_masked, 1);
         let bytes = file
             .element(tags::PIXEL_DATA)
             .unwrap()
@@ -272,5 +301,13 @@ mod tests {
         .unwrap();
         let mut file = build_pixel_obj(3, Some(1));
         assert!(process(&mut file, &cfg).is_err());
+    }
+
+    #[test]
+    #[cfg(not(feature = "charls"))]
+    fn jpegls_needs_charls_feature() {
+        assert!(unsupported_without_feature("1.2.840.10008.1.2.4.80"));
+        assert!(unsupported_without_feature("1.2.840.10008.1.2.4.81"));
+        assert!(!unsupported_without_feature("1.2.840.10008.1.2.1"));
     }
 }

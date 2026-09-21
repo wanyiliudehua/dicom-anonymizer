@@ -47,7 +47,10 @@ to its **remapped SOP Instance UID** (`[output] filename = "sop_instance_uid"`),
 so the original instance UID cannot leak through the filename; set
 `filename = "preserve"` to keep the original relative filenames. `audit.jsonl` in
 the output directory has one JSON object per file (status, changed tag count,
-masked-region count, transfer syntaxes, output SHA-256). Exit codes: `0` success,
+`regions_masked` and `samples_masked`, transfer syntaxes, output SHA-256).
+Non-DICOM files are logged with `status: skipped`; a file whose transfer syntax
+cannot be decoded (e.g. JPEG-LS without `--features charls`) is logged with
+`status: unsupported` and the batch continues. Exit codes: `0` success,
 `1` partial failure, `2` fatal error.
 
 ## De-identification table

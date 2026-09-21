@@ -1,4 +1,4 @@
-//! Recursive discovery of DICOM files under an input directory.
+//! Recursive discovery of files under an input directory.
 
 use crate::error::Result;
 use std::io::Read;
@@ -9,6 +9,8 @@ use walkdir::WalkDir;
 pub struct Job {
     pub input: PathBuf,
     pub rel: PathBuf,
+    /// Whether the file is DICOM (`DICM` magic at offset 128).
+    pub dicom: bool,
 }
 
 /// A file is DICOM when bytes 128..132 are the `DICM` magic.
@@ -23,7 +25,8 @@ pub fn is_dicom_file(path: &Path) -> bool {
     }
 }
 
-/// Walk `input`, returning one job per DICOM file with its relative path.
+/// Walk `input`, returning one job per file (DICOM and non-DICOM) with its
+/// relative path. Non-DICOM files are reported so the audit can log them.
 pub fn discover(input: &Path) -> Result<Vec<Job>> {
     let mut jobs = Vec::new();
     for entry in WalkDir::new(input)
@@ -35,13 +38,11 @@ pub fn discover(input: &Path) -> Result<Vec<Job>> {
             continue;
         }
         let path = entry.path();
-        if !is_dicom_file(path) {
-            continue;
-        }
         let rel = path.strip_prefix(input).unwrap_or(path).to_path_buf();
         jobs.push(Job {
             input: path.to_path_buf(),
             rel,
+            dicom: is_dicom_file(path),
         });
     }
     jobs.sort_by(|a, b| a.rel.cmp(&b.rel));
@@ -76,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn discover_walks_and_keeps_relative_paths() {
+    fn discover_reports_dicom_and_non_dicom() {
         let d = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(d.path().join("sub")).unwrap();
         write_dicom_like(&d.path().join("top.dcm"));
@@ -89,7 +90,12 @@ mod tests {
             .collect();
         assert!(rels.contains(&"top.dcm".to_string()));
         assert!(rels.contains(&"sub/deep.dcm".to_string()));
-        assert_eq!(jobs.len(), 2);
+        assert!(rels.contains(&"sub/readme.txt".to_string()));
+        assert_eq!(jobs.len(), 3);
+        let nd = jobs.iter().find(|j| j.rel.ends_with("readme.txt")).unwrap();
+        assert!(!nd.dicom);
+        let dd = jobs.iter().find(|j| j.rel.ends_with("top.dcm")).unwrap();
+        assert!(dd.dicom);
     }
 
     #[test]

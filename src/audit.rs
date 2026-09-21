@@ -24,6 +24,7 @@ pub struct Record {
     pub transfer_syntax_out: Option<String>,
     pub tags_changed: usize,
     pub regions_masked: usize,
+    pub samples_masked: usize,
     pub output_sha256: Option<String>,
     pub duration_ms: u128,
 }
@@ -44,6 +45,7 @@ impl Record {
             transfer_syntax_out: None,
             tags_changed: tags,
             regions_masked: masked,
+            samples_masked: 0,
             output_sha256: None,
             duration_ms: 0,
         }
@@ -59,6 +61,7 @@ impl Record {
             transfer_syntax_out: None,
             tags_changed: 0,
             regions_masked: 0,
+            samples_masked: 0,
             output_sha256: None,
             duration_ms: 0,
         }
@@ -74,6 +77,7 @@ impl Record {
             transfer_syntax_out: None,
             tags_changed: 0,
             regions_masked: 0,
+            samples_masked: 0,
             output_sha256: None,
             duration_ms: 0,
         }
@@ -102,7 +106,7 @@ mod tests {
     fn jsonl_record_has_required_fields() {
         let r = Record::ok("in.dcm", "out.dcm", 3, 2);
         let s = serde_json::to_string(&r).unwrap();
-        for k in ["input", "output", "status", "tags_changed", "regions_masked"] {
+        for k in ["input", "output", "status", "tags_changed", "regions_masked", "samples_masked"] {
             assert!(s.contains(k), "missing {k}");
         }
     }

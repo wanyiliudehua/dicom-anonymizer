@@ -7,7 +7,7 @@ use crate::deid::dates::DateShifter;
 use crate::deid::dataset as ds;
 use crate::deid::uids::UidMapper;
 use crate::discovery::Job;
-use crate::error::Result;
+use crate::error::{AnonError, Result};
 use crate::pixel::stage;
 use crate::writer;
 use dicom_object::InMemDicomObject;
@@ -57,6 +57,13 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
     let start = Instant::now();
     let input_str = rel_str(&job.rel);
 
+    // Non-DICOM files are logged as skipped (spec §11).
+    if !job.dicom {
+        let rec = Record::skipped(input_str, Status::Skipped);
+        emit(log, &rec);
+        return Ok(rec);
+    }
+
     let mut obj = match dicom_object::open_file(&job.input) {
         Ok(o) => o,
         Err(e) => {
@@ -98,8 +105,17 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     }
 
-    let regions_masked = match stage::process(&mut obj, &shared.cfg) {
-        Ok(n) => n,
+    let report = match stage::process(&mut obj, &shared.cfg) {
+        Ok(r) => r,
+        Err(AnonError::Unsupported(ts)) => {
+            eprintln!(
+                "info: {} uses transfer syntax {ts}, which is not supported; skipping",
+                job.rel.display()
+            );
+            let rec = Record::skipped(input_str, Status::Unsupported);
+            emit(log, &rec);
+            return Ok(rec);
+        }
         Err(e) => {
             let rec = Record::error(input_str, format!("pixel: {e}"));
             emit(log, &rec);
@@ -118,7 +134,8 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     };
 
-    let mut rec = Record::ok(input_str, rel_str(&out_rel), tags_changed, regions_masked);
+    let mut rec = Record::ok(input_str, rel_str(&out_rel), tags_changed, report.regions_masked);
+    rec.samples_masked = report.samples_masked;
     rec.transfer_syntax_in = Some(ts_in);
     rec.transfer_syntax_out = Some(obj.meta().transfer_syntax().to_string());
     rec.duration_ms = start.elapsed().as_millis();
@@ -204,7 +221,7 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath.clone(), rel: "p.dcm".into() };
+        let job = Job { input: inpath.clone(), rel: "p.dcm".into(), dicom: true };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, crate::audit::Status::Ok);
@@ -232,7 +249,7 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: true,
         };
-        let job = Job { input: inpath, rel: "p.dcm".into() };
+        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, crate::audit::Status::Ok);
@@ -275,7 +292,7 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into() };
+        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into(), dicom: true };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);
@@ -320,7 +337,7 @@ mod tests {
             out_root: out.path().to_path_buf(),
             dry_run: false,
         };
-        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into() };
+        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into(), dicom: true };
         let mut sink = Vec::new();
         let rec = process_job(&shared, &job, &mut sink).unwrap();
         assert_eq!(rec.status, Status::Ok);
