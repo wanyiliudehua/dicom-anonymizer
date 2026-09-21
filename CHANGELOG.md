@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--check-leaks`: after the run, re-read the input tree for identifying strings and
+  scan every text value in the output tree for them. Any hit is printed with its
+  file, tag and identifier, and the run exits `1` — so an attribute the profile was
+  told to retain cannot silently carry a name through. UI values are skipped (UIDs are
+  remapped, so their digits are expected) and categories the user explicitly retained
+  (`retain_institution_identity`) are excluded, keeping the check false-positive-free.
+
 ## [0.1.0] - 2026-09-21
 
 Initial release.

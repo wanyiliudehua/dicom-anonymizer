@@ -39,8 +39,37 @@ fn repeating_group_action(tag: Tag) -> Option<Action> {
     None
 }
 
-/// Apply the effective rules to `obj`, recursing into sequences.
-/// Returns the number of elements changed.
+/// Identifiers grouped by the kind of attribute they came from, so the leak
+/// check can ignore categories the user explicitly chose to retain.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Identifiers {
+    pub patient: Vec<String>,
+    pub names: Vec<String>,
+    pub orgs: Vec<String>,
+}
+
+impl Identifiers {
+    /// Every identifier, sorted and de-duplicated (the scrub set).
+    pub fn all(&self) -> Vec<String> {
+        let mut v: Vec<String> = self
+            .patient
+            .iter()
+            .chain(&self.names)
+            .chain(&self.orgs)
+            .cloned()
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    pub fn merge(&mut self, other: &Identifiers) {
+        self.patient.extend(other.patient.iter().cloned());
+        self.names.extend(other.names.iter().cloned());
+        self.orgs.extend(other.orgs.iter().cloned());
+    }
+}
+
 /// Attribute groups whose values identify the subject, used for text scrubbing.
 const ID_PLAIN: &[Tag] = &[
     Tag(0x0010, 0x0020), // Patient ID
@@ -66,23 +95,28 @@ const ID_ORGS: &[Tag] = &[
 /// Names contribute their components; institution-like values also contribute
 /// their (length-filtered) words, because descriptors often carry a *substring*
 /// of the institution rather than the whole string.
-fn collect_identifiers(obj: &InMemDicomObject) -> Vec<String> {
-    let mut ids = Vec::new();
-    for (tags, min, split) in [
-        (ID_PLAIN, 3usize, false),
-        (ID_NAMES, 3, true),
-        (ID_ORGS, 4, true),
-    ] {
-        for tag in tags {
-            let Some(value) = ds::get_string(obj, *tag) else {
-                continue;
-            };
-            add_identifier(&mut ids, &value, min, split);
+pub fn collect_identifiers(obj: &InMemDicomObject) -> Identifiers {
+    let (mut patient, mut names, mut orgs) = (Vec::new(), Vec::new(), Vec::new());
+    for tag in ID_PLAIN {
+        if let Some(v) = ds::get_string(obj, *tag) {
+            add_identifier(&mut patient, &v, 3, false);
         }
     }
-    ids.sort();
-    ids.dedup();
-    ids
+    for tag in ID_NAMES {
+        if let Some(v) = ds::get_string(obj, *tag) {
+            add_identifier(&mut names, &v, 3, true);
+        }
+    }
+    for tag in ID_ORGS {
+        if let Some(v) = ds::get_string(obj, *tag) {
+            add_identifier(&mut orgs, &v, 4, true);
+        }
+    }
+    Identifiers {
+        patient,
+        names,
+        orgs,
+    }
 }
 
 fn add_identifier(ids: &mut Vec<String>, raw: &str, min: usize, split: bool) {
@@ -133,11 +167,13 @@ fn scrub(text: &str, ids: &[String]) -> String {
         .to_string()
 }
 
+/// Apply the effective rules to `obj`, recursing into sequences.
+/// Returns the number of elements changed.
 pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
     let rules: std::collections::HashMap<Tag, Action> =
         effective_rules(ctx.cfg)?.into_iter().collect();
     let patient_id = ds::get_string(obj, Tag(0x0010, 0x0020)).unwrap_or_default();
-    let identifiers = collect_identifiers(obj);
+    let identifiers = collect_identifiers(obj).all();
     let offset = ctx.dates.offset_for(&patient_id);
     let mut changed = 0usize;
 

@@ -27,7 +27,7 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
 ## Usage
 
     dicom-anonymizer --input ./in --output ./out [--config config.toml] \
-      [--jobs N] [--dry-run] [--fail-fast] [--verbose]
+      [--jobs N] [--dry-run] [--check-leaks] [--fail-fast] [--verbose]
 
 - `--input` / `--output`: DICOM source tree and a separate output tree
   (inputs are never modified).
@@ -40,6 +40,11 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
   retains patient demographics (sex, age, size, weight) and all dates/times.
 - `--jobs N`: process files in parallel with N threads.
 - `--dry-run`: run everything except writes and print audit records to stdout.
+- `--check-leaks`: after the run, verify the result by re-reading the input tree for
+  identifying strings (person names and their components, patient / other-patient IDs,
+  accession number, institution name/address/department words) and scanning every
+  output value for them. Any hit is printed and the run exits `1`, so an attribute the
+  profile was told to retain cannot silently carry a name through.
 
 See `dicom-anonymizer.example.toml` for all options.
 

@@ -7,6 +7,7 @@ mod error;
 mod pipeline;
 mod pixel;
 mod report;
+mod verify;
 mod writer;
 
 use clap::Parser;
@@ -40,13 +41,6 @@ fn run() -> i32 {
                 return 2;
             }
         };
-    }
-
-    if cfg.profile.clean_descriptors || cfg.profile.clean_structured_content {
-        eprintln!(
-            "warning: clean_descriptors / clean_structured_content are not implemented; \
-             those fields are not cleaned"
-        );
     }
 
     if !args.input.is_dir() {
@@ -172,7 +166,48 @@ fn run() -> i32 {
     if audit_failed {
         return 1;
     }
+    if args.check_leaks {
+        if args.dry_run {
+            eprintln!(
+                "note: --check-leaks needs an output tree, and --dry-run writes none; skipping"
+            );
+        } else if !check_leaks(&args.input, &args.output, &shared.cfg) {
+            return 1;
+        }
+    }
     summary.exit_code()
+}
+
+/// Re-read the input tree to learn what was identifying, then re-read the
+/// output tree and report anything that survived. Returns true when clean.
+fn check_leaks(input: &std::path::Path, output: &std::path::Path, cfg: &config::Config) -> bool {
+    let harvested = match verify::harvest(input) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("error: leak check could not read the input tree: {e}");
+            return false;
+        }
+    };
+    let ids = verify::check_set(&harvested, cfg);
+    let leaks = match verify::scan(output, &ids) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("error: leak check could not read the output tree: {e}");
+            return false;
+        }
+    };
+    for l in &leaks {
+        eprintln!(
+            "leak: {} ({:04X},{:04X}) still contains `{}`",
+            l.file, l.tag.0, l.tag.1, l.identifier
+        );
+    }
+    eprintln!(
+        "leak check: {} hit(s) from {} identifier(s)",
+        leaks.len(),
+        ids.len()
+    );
+    leaks.is_empty()
 }
 
 fn random_salt() -> Vec<u8> {

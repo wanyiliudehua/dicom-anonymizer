@@ -1,10 +1,16 @@
-use dicom_core::{DataElement, VR};
+use dicom_core::{DataElement, Tag, VR};
 use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
 use std::path::Path;
 
 /// Write a minimal DICOM file with identity fields at `path`.
 pub fn write_fixture(path: &Path, name: &str, study_uid: &str) {
-    let obj = InMemDicomObject::from_element_iter([
+    write_fixture_extra(path, name, study_uid, &[]);
+}
+
+/// Same as [`write_fixture`], plus caller-supplied extra elements (e.g. private
+/// attributes, for exercising the leak check).
+pub fn write_fixture_extra(path: &Path, name: &str, study_uid: &str, extra: &[(Tag, VR, &str)]) {
+    let mut elems: Vec<DataElement<InMemDicomObject>> = vec![
         DataElement::new(dicom_dictionary_std::tags::PATIENT_NAME, VR::PN, name),
         DataElement::new(dicom_dictionary_std::tags::PATIENT_ID, VR::LO, "PID-1"),
         DataElement::new(
@@ -23,8 +29,11 @@ pub fn write_fixture(path: &Path, name: &str, study_uid: &str) {
             format!("{study_uid}.1"),
         ),
         DataElement::new(dicom_dictionary_std::tags::MODALITY, VR::CS, "CT"),
-    ]);
-    let file = obj
+    ];
+    for (tag, vr, value) in extra {
+        elems.push(DataElement::new(*tag, *vr, value.to_string()));
+    }
+    let file = InMemDicomObject::from_element_iter(elems)
         .with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
         .unwrap();
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();

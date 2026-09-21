@@ -1,6 +1,7 @@
 mod common;
 
 use assert_cmd::Command;
+use dicom_core::{Tag, VR};
 use predicates::prelude::*;
 
 #[test]
@@ -61,6 +62,87 @@ fn end_to_end_mirrors_tree_and_deidentifies() {
         .and_then(|e| e.to_str().ok().map(|s| s.to_string()));
     assert_eq!(u1, u2);
     assert!(u1.unwrap().starts_with("2.25."));
+}
+
+#[test]
+fn leak_check_passes_on_a_clean_run() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture_extra(
+        &src.path().join("one.dcm"),
+        "Doe^John",
+        "1.2.3",
+        &[(
+            Tag(0x0008, 0x0080),
+            VR::LO,
+            "WanNan Medical College YiJiShan Hospital",
+        )],
+    );
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .arg("--check-leaks")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("leak check: 0 hit(s)"));
+}
+
+#[test]
+fn leak_check_fails_when_a_retained_attribute_carries_phi() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    // A private block the profile is told to retain, carrying the patient name.
+    common::write_fixture_extra(
+        &src.path().join("one.dcm"),
+        "Doe^John",
+        "1.2.3",
+        &[
+            (Tag(0x0009, 0x0010), VR::LO, "ACME 1.0"),
+            (Tag(0x0009, 0x1001), VR::LO, "Doe^John"),
+        ],
+    );
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[profile]\nretain_safe_private = true\n").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .arg("--check-leaks")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("leak:"));
+}
+
+#[test]
+fn leak_check_is_skipped_in_dry_run() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .arg("--dry-run")
+        .arg("--check-leaks")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "--check-leaks needs an output tree",
+        ));
 }
 
 #[test]

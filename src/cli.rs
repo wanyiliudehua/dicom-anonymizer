@@ -28,6 +28,10 @@ pub struct Args {
     /// Run everything except writes; audit records go to stdout.
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+    /// After the run, verify that no identifier harvested from the input tree
+    /// survives in the output tree (exits 1 on any hit).
+    #[arg(long, default_value_t = false)]
+    pub check_leaks: bool,
     /// Stop at the first per-file error.
     #[arg(long, default_value_t = false)]
     pub fail_fast: bool,
@@ -67,5 +71,13 @@ mod tests {
     fn exposes_a_version() {
         use clap::CommandFactory;
         assert!(Args::command().get_version().is_some());
+    }
+
+    #[test]
+    fn check_leaks_is_opt_in() {
+        let a = Args::try_parse_from(["x", "-i", "in", "-o", "out"]).unwrap();
+        assert!(!a.check_leaks);
+        let b = Args::try_parse_from(["x", "-i", "in", "-o", "out", "--check-leaks"]).unwrap();
+        assert!(b.check_leaks);
     }
 }

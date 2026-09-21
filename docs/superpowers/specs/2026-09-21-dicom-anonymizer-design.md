@@ -110,6 +110,7 @@ without shared mutable state.
 | `audit` | JSON Lines record emission | `serde_json` |
 | `error` | Error types, per-file isolation | `thiserror` |
 | `report` | Run summary and exit code selection | — |
+| `verify` | Post-run leak check: harvest input identifiers, scan output values | `dicom-object` |
 
 ## 6. CLI
 
@@ -117,7 +118,7 @@ without shared mutable state.
 dicom-anonymizer \
   --input <DIR> --output <DIR> \
   [--config <FILE>] [--strategy conservative|aggressive] \
-  [--jobs N] [--dry-run] [--fail-fast] [--verbose]
+  [--jobs N] [--dry-run] [--check-leaks] [--fail-fast] [--verbose]
 ```
 
 - `--input` / `--output`: required; output is created if needed.
@@ -127,6 +128,15 @@ dicom-anonymizer \
   `--fail-fast` forces the sequential path.
 - `--dry-run`: full pipeline up to (not including) writes; audit records go to stdout
   and no files are produced.
+- `--check-leaks`: post-run verification. The input tree is re-read for identifying
+  strings (person names and their components, patient / other-patient IDs, accession
+  number, institution name/address/department words — the same harvest the `C` clean
+  action uses), then every text value in the output tree is scanned for them
+  case-insensitively. UI values are skipped (UIDs are remapped, so their digits are
+  expected), keeping the check free of false positives. Categories the user explicitly
+  retained (`retain_institution_identity`) are excluded from the check set. Any hit is
+  reported on stderr and forces exit `1`. Ignored under `--dry-run`, which has no output
+  tree to scan.
 - `--fail-fast`: abort on the first per-file error.
 - `--verbose`: extra progress on stderr.
 - `--version` / `--help`: standard clap output.
@@ -324,8 +334,9 @@ One object per walked file:
   `--fail-fast`.
 - A file needing a transfer syntax it cannot decode is `unsupported`, not `error`.
 - Audit-write failures are surfaced and make the run exit `1`.
-- Exit codes: `0` all files succeeded/skipped; `1` ≥1 error or audit-write failure;
-  `2` fatal (bad args, unreadable config, missing input directory).
+- A `--check-leaks` hit is reported on stderr and makes the run exit `1`.
+- Exit codes: `0` all files succeeded/skipped; `1` ≥1 error, audit-write failure, or
+  leak-check hit; `2` fatal (bad args, unreadable config, missing input directory).
 - A final summary is printed to stderr.
 
 ## 14. Concurrency
@@ -375,7 +386,7 @@ dicom-anonymizer/
     gen_e1_1.py            # regenerates src/deid/e1_1.rs from the standard
     setup-toolchain.sh      # recreates the local Windows toolchain shim
   src/
-    main.rs cli.rs config.rs discovery.rs writer.rs audit.rs error.rs report.rs
+    main.rs cli.rs config.rs discovery.rs writer.rs audit.rs error.rs report.rs verify.rs
     deid/{mod.rs,e1_1.rs,profile.rs,actions.rs,dataset.rs,uids.rs,dates.rs}
     pixel/{mod.rs,geometry.rs,regions.rs,stage.rs}
   tests/{integration.rs,common/mod.rs}
@@ -423,6 +434,8 @@ dicom-anonymizer/
    `cargo build --release --locked`. CI drops the host-specific `.cargo/config.toml`.
 7. Pushing a `v*` tag builds Linux (gnu), Windows (msvc) and macOS (arm64/x86_64)
    release archives and attaches them to a GitHub Release.
+8. `--check-leaks` re-reads the input tree, scans the output tree, reports 0 hits on a
+   clean run, and exits `1` naming file/tag/identifier when an identifier survives.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -453,6 +466,10 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **Release packaging**: `Cargo.toml` metadata + `LICENSE` + `CHANGELOG.md`, a
   `--version` flag, and `.github/workflows/release.yml` (tag `v*` → Linux/Windows/macOS
   archives attached to a GitHub Release).
+- **`--check-leaks`** was added beyond the plan: the same identifier harvest that
+  drives `C` is reused to verify the result, which required grouping harvested
+  identifiers by category (`Identifiers { patient, names, orgs }`) so that categories
+  the user retained are not reported as leaks.
 - **Toolchain shim** added for this host (see §18).
 - **`chrono`, `dicom-core`, `dicom-encoding`, `dicom-dictionary-std`** were added as
   direct dependencies; `hex` and `dicom-transfer-syntax-registry`'s `deflate` feature
