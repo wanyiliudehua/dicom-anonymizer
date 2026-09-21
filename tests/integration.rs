@@ -244,24 +244,92 @@ fn series_layout_falls_back_to_mirror_without_a_series_uid() {
 }
 
 #[test]
-fn clean_survives_a_utf8_specific_character_set() {
+fn clean_survives_the_character_sets_pacs_actually_use() {
+    // DICOM's Simplified Chinese sets are GB18030 / GBK / ISO 2022 IR 58. (IR 149 is
+    // Korean, not Chinese - easy to get backwards.) Each must survive a real
+    // encode/decode round trip, not just an in-memory one.
+    for cs in ["ISO_IR 192", "GB18030", "GBK", "ISO 2022 IR 58"] {
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        common::write_fixture_extra(
+            &src.path().join("one.dcm"),
+            "程英平",
+            "1.2.3",
+            &[
+                (
+                    dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET,
+                    VR::CS,
+                    cs,
+                ),
+                (Tag(0x0008, 0x0080), VR::LO, "万楠医学院附属医院"),
+                (Tag(0x0008, 0x1030), VR::LO, "万楠医学院附属医院^腰椎"),
+                (Tag(0x0008, 0x103E), VR::LO, "局部定位"),
+            ],
+        );
+
+        let cfg_dir = tempfile::tempdir().unwrap();
+        let cfg_path = cfg_dir.path().join("anon.toml");
+        std::fs::write(
+            &cfg_path,
+            "[output]\nfilename = \"preserve\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+
+        Command::cargo_bin("dicom-anonymizer")
+            .unwrap()
+            .args(["-i"])
+            .arg(src.path())
+            .args(["-o"])
+            .arg(out.path())
+            .args(["--config"])
+            .arg(&cfg_path)
+            .assert()
+            .success();
+
+        let o = dicom_object::open_file(out.path().join("one.dcm"))
+            .unwrap_or_else(|e| panic!("{cs}: output not readable: {e}"));
+        let get = |t: Tag| {
+            o.element(t)
+                .ok()
+                .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
+        };
+        // the identifier is gone, the clinical Chinese text is intact
+        assert_eq!(get(Tag(0x0008, 0x1030)).as_deref(), Some("腰椎"), "{cs}");
+        assert_eq!(
+            get(Tag(0x0008, 0x103E)).as_deref(),
+            Some("局部定位"),
+            "{cs}"
+        );
+        // direct identifiers are cleared as usual
+        assert_eq!(get(Tag(0x0010, 0x0010)).as_deref(), Some(""), "{cs}");
+        assert_eq!(get(Tag(0x0008, 0x0080)).as_deref(), Some(""), "{cs}");
+        // and the file stays readable because the character set was kept
+        assert_eq!(
+            get(dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET).as_deref(),
+            Some(cs),
+            "{cs}"
+        );
+    }
+}
+
+#[test]
+fn an_unsupported_character_set_neither_panics_nor_leaks() {
+    // A file may declare a character set this build cannot handle (the crate
+    // supports ISO-IR 148/159, for instance, only as unimplemented). Whatever the
+    // tool does with such a file, it must not panic and must not retain identity.
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();
-    // Chinese text with an explicit UTF-8 character set: the whole point is that
-    // this survives a real encode/decode round trip, not just an in-memory one.
     common::write_fixture_extra(
         &src.path().join("one.dcm"),
-        "程英平",
+        "Doe^John",
         "1.2.3",
         &[
             (
                 dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET,
                 VR::CS,
-                "ISO_IR 192",
+                "ISO 2022 IR 148",
             ),
-            (Tag(0x0008, 0x0080), VR::LO, "万楠医学院附属医院"),
-            (Tag(0x0008, 0x1030), VR::LO, "万楠医学院附属医院^腰椎"),
-            (Tag(0x0008, 0x103E), VR::LO, "局部定位"),
+            (Tag(0x0008, 0x1030), VR::LO, "Doe^John l-spine"),
         ],
     );
 
@@ -284,24 +352,78 @@ fn clean_survives_a_utf8_specific_character_set() {
         .assert()
         .success();
 
+    // Observed: the crate falls back to a default codec rather than failing, so the
+    // file is processed normally - and the identifier must still be gone.
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"ok\""), "{audit}");
+
     let o = dicom_object::open_file(out.path().join("one.dcm")).unwrap();
+    let study = o
+        .element(Tag(0x0008, 0x1030))
+        .ok()
+        .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
+        .unwrap_or_default();
+    assert_eq!(
+        study, "l-spine",
+        "identifier survived an unsupported character set"
+    );
+}
+
+#[test]
+fn non_ascii_text_under_an_unsupported_character_set_is_still_cleaned() {
+    // The gap noted in the spec: an unimplemented charset combined with actual
+    // non-ASCII bytes. The fallback must not produce an unreadable file or let an
+    // accented name through.
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture_extra(
+        &src.path().join("one.dcm"),
+        "Müller^Hans",
+        "1.2.3",
+        &[
+            (
+                dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET,
+                VR::CS,
+                "ISO 2022 IR 148",
+            ),
+            (Tag(0x0008, 0x0080), VR::LO, "Klinik München"),
+            (Tag(0x0008, 0x1030), VR::LO, "Klinik München^l-spine"),
+        ],
+    );
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(
+        &cfg_path,
+        "[output]\nfilename = \"preserve\"\n[profile]\nclean_descriptors = true\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"ok\""), "{audit}");
+
+    let o = dicom_object::open_file(out.path().join("one.dcm"))
+        .expect("output must stay readable under an unsupported character set");
     let get = |t: Tag| {
         o.element(t)
             .ok()
             .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
     };
-    // the identifier is gone, the clinical Chinese text is intact
-    assert_eq!(get(Tag(0x0008, 0x1030)).as_deref(), Some("腰椎"));
-    // untroubled text is untouched
-    assert_eq!(get(Tag(0x0008, 0x103E)).as_deref(), Some("局部定位"));
-    // direct identifiers are cleared as usual
+    // "Müller" and "München" are harvested despite the accented bytes.
+    assert_eq!(get(Tag(0x0008, 0x1030)).as_deref(), Some("l-spine"));
     assert_eq!(get(Tag(0x0010, 0x0010)).as_deref(), Some(""));
     assert_eq!(get(Tag(0x0008, 0x0080)).as_deref(), Some(""));
-    // and the file is still readable because the character set was kept
-    assert_eq!(
-        get(dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET).as_deref(),
-        Some("ISO_IR 192")
-    );
 }
 
 #[test]

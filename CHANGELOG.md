@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remapped, so their digits are expected) and categories the user explicitly retained
   (`retain_institution_identity`) are excluded, keeping the check false-positive-free.
 
+### Tests
+
+- Character-set coverage: `ISO_IR 192`, `GB18030`, `GBK` and `ISO 2022 IR 58` are
+  verified to round-trip through real file IO with identifiers still scrubbed, and an
+  unsupported code (`ISO 2022 IR 148`) is verified to be processed and cleaned rather
+  than failing - including with accented non-ASCII text, where the output stays readable.
+  (DICOM's `ISO 2022 IR 149` is the Korean set, not the Chinese one.)
+
 ### Fixed
 
 - The `C` clean action no longer normalizes whitespace in a text value when it removed

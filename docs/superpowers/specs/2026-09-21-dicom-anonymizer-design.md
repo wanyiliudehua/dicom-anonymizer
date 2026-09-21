@@ -435,6 +435,15 @@ dicom-anonymizer/
   pixel values are preserved.
 - **Irreversible** by design; **non-reproducible by default** due to random salts.
 - **No OCR**: burned-in text is only masked where configured.
+- **Character sets.** Text is decoded/encoded through `dicom-encoding`'s codec table;
+  the `encoding` crate is a **non-optional** dependency there, so no Cargo feature is
+  needed for non-Latin text. Locked in by test: `ISO_IR 192`, `GB18030`, `GBK`,
+  `ISO 2022 IR 58`. Note the trap - DICOM's `ISO 2022 IR 149` is the **Korean** set;
+  the Simplified Chinese sets are GB18030 / GBK / IR 58. An unknown or unimplemented
+  code (e.g. `ISO 2022 IR 148`/`159`) does not fail: the crate falls back to a default
+  codec, the file is still processed (verified: `status = ok`) and still cleaned, and
+  accented non-ASCII text under such a fallback is verified to stay readable with the
+  identifier still removed.
 - **`PlanarConfiguration = 1`** files are rejected when masking is needed.
 - **DICOMDIR** is skipped, so media directory indexes are not updated.
 - **Machine-specific build**: this host has no working MinGW `dlltool` and no MSVC
@@ -503,6 +512,12 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   or institution survived untouched. Matching is now Unicode-aware over `char`s with a
   script-aware length floor. Note this was latent for the sample dataset, which declares
   `ISO_IR 100` and has non-ASCII bytes only in binary VRs (US/OB and private tags).
+- **Character-set support was verified, not assumed.** Tests pin `ISO_IR 192`, `GB18030`,
+  `GBK` and `ISO 2022 IR 58` round-tripping through real file IO, plus an unsupported
+  code (`ISO 2022 IR 148`) which the crate handles by falling back rather than failing -
+  including with accented non-ASCII text. No behaviour change was needed. The finding
+  that `ISO 2022 IR 149` is Korean, not Chinese, corrected an assumption made while
+  planning this work.
 - **Toolchain shim** added for this host (see §18).
 - **`chrono`, `dicom-core`, `dicom-encoding`, `dicom-dictionary-std`** were added as
   direct dependencies; `hex` and `dicom-transfer-syntax-registry`'s `deflate` feature
