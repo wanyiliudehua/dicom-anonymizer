@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
 ### Added
 
 - `[limits] max_parallel_bytes` (default 1 GiB, `0` disables): the job count is reduced so
@@ -79,8 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsupported code (`ISO 2022 IR 148`) is verified to be processed and cleaned rather
   than failing - including with accented non-ASCII text, where the output stays readable.
   (DICOM's `ISO 2022 IR 149` is the Korean set, not the Chinese one.)
-
-### Fixed
 
 ### Fixed
 
@@ -200,5 +200,6 @@ Initial release.
 - `PlanarConfiguration = 1` colour images are rejected when pixel masking is
   required.
 
-[Unreleased]: https://github.com/OWNER/REPO/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/OWNER/REPO/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/OWNER/REPO/releases/tag/v0.2.0
 [0.1.0]: https://github.com/OWNER/REPO/releases/tag/v0.1.0

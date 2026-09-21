@@ -403,7 +403,7 @@ leaves a partial audit and a partial output tree that are indistinguishable from
 finished product. The marker written at the end of a run is what separates them:
 
 ```json
-{ "tool": "dicom-anonymizer", "version": "0.1.0", "outcome": "complete",
+{ "tool": "dicom-anonymizer", "version": "0.2.0", "outcome": "complete",
   "total": 70, "ok": 69, "skipped": 1, "unsupported": 0, "error": 0,
   "audit_complete": true }
 ```

@@ -128,7 +128,7 @@ the output directory has one JSON object per file (status, changed tag count,
 At the end of a run the tool also writes `run.json`:
 
 ```json
-{ "tool": "dicom-anonymizer", "version": "0.1.0", "outcome": "complete",
+{ "tool": "dicom-anonymizer", "version": "0.2.0", "outcome": "complete",
   "total": 70, "ok": 69, "skipped": 1, "unsupported": 0, "error": 0,
   "audit_complete": true }
 ```
