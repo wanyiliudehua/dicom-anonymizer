@@ -49,9 +49,30 @@ const CONSERVATIVE_RETAIN: &[&str] = &[
     "0040,0251", // Performed Procedure Step End Time
 ];
 
+/// The option-column keys the engine understands.
+///
+/// `option_enabled` must handle exactly these. The generated table emits the same set minus
+/// `rtn_safe_priv`, which is handled by tag group in `actions::apply` rather than by a table
+/// row - private attributes do not appear in E.1-1 - and is kept here so the key is not
+/// silently unrecognised. A test checks both directions of that correspondence, because a
+/// generated key the match does not know about would disable its option with no error.
+pub const OPTION_KEYS: &[&str] = &[
+    "rtn_safe_priv",
+    "rtn_uids",
+    "rtn_dev_id",
+    "rtn_inst_id",
+    "rtn_pat_chars",
+    "rtn_long_full_dates",
+    "rtn_long_modif_dates",
+    "clean_desc",
+    "clean_struct",
+    "clean_graph",
+];
+
 /// Whether a PS3.15 option (E.1-1 column key) is enabled in the config.
 fn option_enabled(cfg: &Config, key: &str) -> bool {
     match key {
+        // Handled by tag group in `actions::apply`; E.1-1 has no private-attribute rows.
         "rtn_safe_priv" => cfg.profile.retain_safe_private,
         "rtn_uids" => cfg.profile.retain_uids,
         "rtn_dev_id" => cfg.profile.retain_device_identity,
@@ -91,6 +112,15 @@ pub fn base_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
     }
     for (tag, basic, opts) in E11 {
         let t = parse_tag(tag)?;
+        for (key, _) in opts.iter() {
+            // A generated column key the engine does not understand would silently disable
+            // that option, so it is refused here - once per table walk, not per attribute.
+            if !OPTION_KEYS.contains(key) {
+                return Err(crate::error::AnonError::Config(format!(
+                    "unknown option column `{key}` on {tag}"
+                )));
+            }
+        }
         // The strategy adjusts the *basic* action rather than overwriting the resolved one,
         // so an explicitly enabled option still wins over it. Overwriting afterwards meant a
         // user who asked for shifted dates silently got verbatim dates instead.
@@ -284,6 +314,61 @@ mod tests {
         assert_ne!(m[&parse_tag("0010,1010").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0020").unwrap()], Action::K);
         assert_ne!(m[&parse_tag("0008,0032").unwrap()], Action::K);
+    }
+
+    #[test]
+    fn every_option_key_in_the_table_is_understood() {
+        // A generated key that `option_enabled` does not recognise is silently ignored, which
+        // would turn an option off without any error at all.
+        use std::collections::BTreeSet;
+        let in_table: BTreeSet<&str> = E11
+            .iter()
+            .flat_map(|(_, _, opts)| opts.iter().map(|(k, _)| *k))
+            .collect();
+        let known: BTreeSet<&str> = OPTION_KEYS.iter().copied().collect();
+
+        let unhandled: Vec<&&str> = in_table.difference(&known).collect();
+        assert!(
+            unhandled.is_empty(),
+            "table keys with no handling: {unhandled:?}"
+        );
+
+        let outside: Vec<&&str> = known.difference(&in_table).collect();
+        assert_eq!(
+            outside,
+            vec![&"rtn_safe_priv"],
+            "only the private-tag option is handled outside the table"
+        );
+    }
+
+    #[test]
+    fn the_option_columns_without_their_own_test_are_wired_up() {
+        // clean_structured_content and clean_graphics were the two flags with no test proving
+        // their key reaches the table, so a typo in either would have gone unnoticed.
+        use crate::config::parse_tag;
+        let basic = rule_map(&Config::default());
+        let structured = rule_map(
+            &Config::from_toml_str("[profile]\nclean_structured_content = true\n").unwrap(),
+        );
+        let graphics =
+            rule_map(&Config::from_toml_str("[profile]\nclean_graphics = true\n").unwrap());
+
+        for t in ["0040,0555", "0040,A730", "0040,0610"] {
+            let tag = parse_tag(t).unwrap();
+            assert_ne!(basic[&tag], Action::C, "{t} is not cleaned by default");
+            assert_eq!(structured[&tag], Action::C, "clean_struct must reach {t}");
+        }
+        let g = parse_tag("0070,0001").unwrap();
+        assert_ne!(
+            basic[&g],
+            Action::C,
+            "annotations are not cleaned by default"
+        );
+        assert_eq!(
+            graphics[&g],
+            Action::C,
+            "clean_graph must reach Graphic Annotation Sequence"
+        );
     }
 
     #[test]

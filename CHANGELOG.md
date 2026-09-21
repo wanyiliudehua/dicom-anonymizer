@@ -61,6 +61,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Every option column the generator emits is checked against the set the engine
+  understands, in both directions: an unrecognised key used to disable its option with no
+  error at all, and the table walk now refuses one outright. `rtn_safe_priv` is the only
+  handled key deliberately absent from the table (private attributes are handled by tag
+  group, not by an E.1-1 row), and the test pins that as the exception.
+- `clean_structured_content` and `clean_graphics` were the two option flags with no test
+  proving their key reaches the table (4 and 1 applications); both are now covered, as is
+  the `retain_safe_private` behaviour with an identifying private element.
 - A file that declares **no** `SpecificCharacterSet` while carrying non-ASCII text is
   verified to round-trip **byte-for-byte** and still be cleaned, using a fixture built
   from hand-written bytes because the writer refuses to produce one. An earlier claim
