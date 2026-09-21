@@ -222,6 +222,24 @@ Actions:
 | `C` | Clean: strip this object's own identifiers (patient/physician name components, IDs, institution words) from the text value and keep the rest; non-text values are neutralized, and temporal attributes under the Modified Dates option are shifted instead |
 | `K` | Keep |
 
+- **Identifier harvest (drives `C`):** before any attribute is changed, the object's
+ow identifying strings are read from the patient/other-patient IDs and accession
+number (whole value), the person-name attributes (whole value plus `^`/`=`/`,`/`;`/
+whitespace/`()`/`/`-separated components), and the institution name/address/
+department (whole value plus its components). Component length floors avoid
+over-scrubbing: 3 characters for ASCII name components, 4 for ASCII institution
+words, and 2 for non-ASCII text. The lower non-ASCII floor exists because dense
+scripts pack a whole name into two characters, while matching is by substring -
+harvesting a 2-character ASCII token such as `Li` would tear `Ligament` apart.
+- **Scrub:** matching is Unicode-aware (`char::to_lowercase`, not byte folding) and
+case-insensitive; the needle keeps its original character count so the removed range
+is always the length of the source text it replaced. If nothing matches, the value is
+returned **byte for byte** instead of being normalized. After a removal, runs of
+whitespace are collapsed and leading/trailing `^` trimmed.
+- **Character sets:** text is decoded/encoded through the dataset's
+`SpecificCharacterSet`, which is itself never modified (it is not in E.1-1), so a
+UTF-8 (`ISO_IR 192`) file stays readable and its non-ASCII identifiers are still
+scrubbed.
 - **Base table:** the full PS3.15 Table E.1-1 (`deid::e1_1::E11`, 653 attributes),
   **generated** from the DICOM standard by `scripts/gen_e1_1.py`. Each row is
   `(tag, basic_action, &[(option_key, action)])`. Ambiguous cells (`X/Z`, `X/Z/D`, …)
@@ -480,6 +498,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
 - **`C` no longer normalizes whitespace when nothing matched.** The clean action now
   returns the value byte-for-byte unless it actually removed an identifier, matching the
   documented "no identifier present → unchanged" behaviour.
+- **Non-ASCII identifiers are now harvested and scrubbed.** `C` previously bailed out on
+  any value containing a non-ASCII byte and skipped non-ASCII candidates, so a CJK name
+  or institution survived untouched. Matching is now Unicode-aware over `char`s with a
+  script-aware length floor. Note this was latent for the sample dataset, which declares
+  `ISO_IR 100` and has non-ASCII bytes only in binary VRs (US/OB and private tags).
 - **Toolchain shim** added for this host (see §18).
 - **`chrono`, `dicom-core`, `dicom-encoding`, `dicom-dictionary-std`** were added as
   direct dependencies; `hex` and `dicom-transfer-syntax-registry`'s `deflate` feature

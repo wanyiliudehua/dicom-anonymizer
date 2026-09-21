@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `C` clean action no longer normalizes whitespace in a text value when it removed
   nothing, matching the documented "no identifier present → unchanged" behaviour.
+- The `C` clean action now handles **non-ASCII** identifiers. It previously skipped any
+  value containing a non-ASCII byte and never harvested non-ASCII candidates, so a CJK
+  or Cyrillic patient name or institution name survived cleaning untouched. Matching is
+  now Unicode-aware case-insensitive over characters, with a script-aware length floor
+  (2 characters for non-ASCII text, 3-4 for ASCII) so short ASCII tokens cannot shred
+  clinical words.
 
 ## [0.1.0] - 2026-09-21
 

@@ -121,10 +121,16 @@ pub fn collect_identifiers(obj: &InMemDicomObject) -> Identifiers {
 
 fn add_identifier(ids: &mut Vec<String>, raw: &str, min: usize, split: bool) {
     let s = raw.trim();
-    if s.is_empty() || !s.is_ascii() {
+    if s.is_empty() {
         return;
     }
-    let ok = |t: &str| t.chars().count() >= min && t.is_ascii();
+    // Two CJK characters are a whole name, while two ASCII characters are
+    // usually a fragment ("Li" occurs inside "Ligament") - and matching is by
+    // substring. So the ASCII floor stays put and dense scripts get a lower one.
+    let ok = |t: &str| {
+        let floor = if t.is_ascii() { min } else { 2 };
+        t.chars().count() >= floor
+    };
     if ok(s) {
         ids.push(s.to_string());
     }
@@ -143,37 +149,47 @@ fn add_identifier(ids: &mut Vec<String>, raw: &str, min: usize, split: bool) {
 /// Remove each identifier (case-insensitive) from a text value. A value with no
 /// match is returned unchanged.
 fn scrub(text: &str, ids: &[String]) -> String {
-    if !text.is_ascii() {
-        return text.to_string();
-    }
-    let mut out = text.to_string();
+    let mut chars: Vec<char> = text.chars().collect();
     let mut removed = false;
     for id in ids {
-        let needle = id.to_ascii_lowercase();
+        // Match case-insensitively but keep the needle at its original character
+        // count: `to_lowercase` can change how many characters a codepoint has,
+        // so a span measured on a lowercased copy would remove the wrong range.
+        let needle: Vec<char> = id.chars().collect();
         if needle.is_empty() {
             continue;
         }
-        loop {
-            let lower = out.to_ascii_lowercase();
-            match lower.find(&needle) {
-                Some(pos) => {
-                    out.replace_range(pos..pos + needle.len(), "");
-                    removed = true;
-                }
-                None => break,
-            }
+        while let Some(pos) = find_ci(&chars, &needle) {
+            chars.drain(pos..pos + needle.len());
+            removed = true;
         }
     }
     if !removed {
-        // Nothing matched, so `out` is still the original: hand it back untouched
+        // Nothing matched, so the text is untouched: hand it back byte for byte
         // rather than normalizing whitespace we were not asked to touch.
-        return out;
+        return text.to_string();
     }
-    out.split_whitespace()
+    chars
+        .iter()
+        .collect::<String>()
+        .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
         .trim_matches(|c| c == '^' || c == ' ')
         .to_string()
+}
+
+/// Case-insensitive, Unicode-aware, character-level substring search.
+fn find_ci(hay: &[char], needle: &[char]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return None;
+    }
+    (0..=hay.len() - needle.len()).find(|&i| {
+        needle
+            .iter()
+            .zip(&hay[i..i + needle.len()])
+            .all(|(n, h)| n.to_lowercase().eq(h.to_lowercase()))
+    })
 }
 
 /// Apply the effective rules to `obj`, recursing into sequences.
@@ -647,6 +663,92 @@ mod tests {
         assert_eq!(
             crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
             Some("l-spine  T2  w")
+        );
+    }
+
+    #[test]
+    fn clean_scrubs_non_ascii_identifiers() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(Tag(0x0010, 0x0010), VR::PN, "程英平"),
+            DataElement::new(Tag(0x0008, 0x0080), VR::LO, "万楠医学院附属医院"),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "万楠医学院附属医院^腰椎"),
+        ]);
+        apply(&mut o, &c).unwrap();
+        // The CJK institution is stripped and the clinical text survives.
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("腰椎")
+        );
+    }
+
+    #[test]
+    fn clean_handles_short_cjk_names() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        // Two CJK characters are a whole name, so the ASCII length floor of 3
+        // must not be applied to them.
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(Tag(0x0010, 0x0010), VR::PN, "李伟"),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "李伟^腰椎"),
+        ]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("腰椎")
+        );
+    }
+
+    #[test]
+    fn clean_is_case_insensitive_for_non_ascii() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(Tag(0x0010, 0x0010), VR::PN, "Иванов"),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "иванов И.И."),
+        ]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("И.И.")
+        );
+    }
+
+    #[test]
+    fn short_ascii_tokens_are_not_scrubbed() {
+        let cfg = Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[profile]\nclean_descriptors = true\n",
+        )
+        .unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        // Matching is by substring, so a 2-character ASCII token such as "Li"
+        // would tear "Ligament" apart. Keep the ASCII floor at 3.
+        let mut o = InMemDicomObject::from_element_iter([
+            DataElement::new(Tag(0x0010, 0x0010), VR::PN, "Li^Wei"),
+            DataElement::new(Tag(0x0008, 0x1030), VR::LO, "Ligament tear"),
+        ]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x1030)).as_deref(),
+            Some("Ligament tear")
         );
     }
 }

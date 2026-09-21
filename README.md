@@ -124,6 +124,13 @@ InstitutionName    WanNan Medical College YiJiShan Hospital   -> (removed)
 StudyDescription   YiJiShan Hospital^l-spine                 -> l-spine
 ```
 
+Matching is Unicode-aware and case-insensitive, so non-ASCII names are removed too:
+CJK text written with a UTF-8 `SpecificCharacterSet` is cleaned, and the character-set
+attribute itself is never modified. Because matching is by substring, short ASCII tokens
+are deliberately not harvested — scrubbing a 2-character component such as `Li` would
+tear `Ligament` apart — while dense scripts get a lower floor, since two CJK characters
+are already a whole name.
+
 Values whose VR is not textual fall back to neutralization, and temporal attributes
 under the *Modified Dates* option are shifted instead. This is heuristic, not NLP:
 unrecognized free-text PHI is not detected. `clean_structured_content` /

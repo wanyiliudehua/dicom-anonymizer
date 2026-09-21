@@ -244,6 +244,67 @@ fn series_layout_falls_back_to_mirror_without_a_series_uid() {
 }
 
 #[test]
+fn clean_survives_a_utf8_specific_character_set() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    // Chinese text with an explicit UTF-8 character set: the whole point is that
+    // this survives a real encode/decode round trip, not just an in-memory one.
+    common::write_fixture_extra(
+        &src.path().join("one.dcm"),
+        "程英平",
+        "1.2.3",
+        &[
+            (
+                dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET,
+                VR::CS,
+                "ISO_IR 192",
+            ),
+            (Tag(0x0008, 0x0080), VR::LO, "万楠医学院附属医院"),
+            (Tag(0x0008, 0x1030), VR::LO, "万楠医学院附属医院^腰椎"),
+            (Tag(0x0008, 0x103E), VR::LO, "局部定位"),
+        ],
+    );
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(
+        &cfg_path,
+        "[output]\nfilename = \"preserve\"\n[profile]\nclean_descriptors = true\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .success();
+
+    let o = dicom_object::open_file(out.path().join("one.dcm")).unwrap();
+    let get = |t: Tag| {
+        o.element(t)
+            .ok()
+            .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
+    };
+    // the identifier is gone, the clinical Chinese text is intact
+    assert_eq!(get(Tag(0x0008, 0x1030)).as_deref(), Some("腰椎"));
+    // untroubled text is untouched
+    assert_eq!(get(Tag(0x0008, 0x103E)).as_deref(), Some("局部定位"));
+    // direct identifiers are cleared as usual
+    assert_eq!(get(Tag(0x0010, 0x0010)).as_deref(), Some(""));
+    assert_eq!(get(Tag(0x0008, 0x0080)).as_deref(), Some(""));
+    // and the file is still readable because the character set was kept
+    assert_eq!(
+        get(dicom_dictionary_std::tags::SPECIFIC_CHARACTER_SET).as_deref(),
+        Some("ISO_IR 192")
+    );
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();
