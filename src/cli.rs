@@ -15,6 +15,9 @@ pub struct Args {
     /// TOML config file; defaults to the built-in `ps3.15-basic` preset.
     #[arg(short, long)]
     pub config: Option<PathBuf>,
+    /// De-identification strategy: `conservative` or `aggressive`.
+    #[arg(long)]
+    pub strategy: Option<String>,
     /// Worker threads (default: logical CPU count).
     #[arg(short, long)]
     pub jobs: Option<usize>,
@@ -47,5 +50,14 @@ mod tests {
     fn jobs_defaults_to_none() {
         let a = Args::try_parse_from(["x", "-i", "in", "-o", "out"]).unwrap();
         assert_eq!(a.jobs, None);
+    }
+
+    #[test]
+    fn parses_strategy_flag() {
+        let a = Args::try_parse_from([
+            "x", "-i", "in", "-o", "out", "--strategy", "conservative",
+        ])
+        .unwrap();
+        assert_eq!(a.strategy.as_deref(), Some("conservative"));
     }
 }

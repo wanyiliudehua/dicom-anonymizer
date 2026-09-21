@@ -29,6 +29,12 @@ reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
 - `--input` / `--output`: DICOM source tree and a separate output tree
   (inputs are never modified).
 - `--config`: TOML config; defaults to the built-in `ps3.15-basic` preset.
+- `--strategy conservative|aggressive`: de-identification level (overrides the
+  config). **aggressive** (default) clears every potentially identifying
+  attribute and keeps only the image's own clinical parameters.
+  **conservative** clears the direct identifiers (name, ID, birth date,
+  accession number, institution, device serial, physician names, ...) but
+  retains patient demographics (sex, age, size, weight) and all dates/times.
 - `--jobs N`: process files in parallel with N threads.
 - `--dry-run`: run everything except writes and print audit records to stdout.
 

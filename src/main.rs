@@ -20,7 +20,7 @@ fn main() {
 fn run() -> i32 {
     let args = cli::Args::parse();
 
-    let cfg = match &args.config {
+    let mut cfg = match &args.config {
         Some(p) => match config::Config::load(p) {
             Ok(c) => c,
             Err(e) => {
@@ -30,6 +30,17 @@ fn run() -> i32 {
         },
         None => config::Config::default(),
     };
+
+    if let Some(s) = &args.strategy {
+        cfg.profile.strategy = match s.to_ascii_lowercase().as_str() {
+            "conservative" => config::Strategy::Conservative,
+            "aggressive" => config::Strategy::Aggressive,
+            other => {
+                eprintln!("error: unknown --strategy `{other}` (use conservative|aggressive)");
+                return 2;
+            }
+        };
+    }
 
     if cfg.profile.clean_descriptors || cfg.profile.clean_structured_content {
         eprintln!(

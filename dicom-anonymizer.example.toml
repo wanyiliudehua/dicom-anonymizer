@@ -1,6 +1,7 @@
 # Example configuration. Values shown are the defaults unless noted.
 [profile]
 base = "ps3.15-basic"                # or "research"
+strategy = "aggressive"              # conservative | aggressive
 retain_longitudinal_temporal = false
 retain_safe_private = false
 clean_descriptors = false

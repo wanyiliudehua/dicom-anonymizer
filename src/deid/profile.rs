@@ -5,7 +5,7 @@
 //! The table below is a curated high-risk subset; extend it to the full E.1-1
 //! as needed. The test `covers_high_risk_identifiers` is the minimum bar.
 
-use crate::config::{parse_tag, Action, Config};
+use crate::config::{parse_tag, Action, Config, Strategy};
 use crate::error::Result;
 use dicom_core::Tag;
 
@@ -135,6 +135,35 @@ const BASE: &[(&str, Action)] = &[
     ("7FE0,0010", Action::K), // Pixel Data (never a tag action)
 ];
 
+/// Tags retained verbatim under the `conservative` strategy: patient
+/// demographics and all dates/times.
+const CONSERVATIVE_RETAIN: &[&str] = &[
+    "0010,0040", // Patient's Sex
+    "0010,1010", // Patient's Age
+    "0010,1020", // Patient's Size
+    "0010,1030", // Patient's Weight
+    "0008,0012", // Instance Creation Date
+    "0008,0013", // Instance Creation Time
+    "0008,0020", // Study Date
+    "0008,0021", // Series Date
+    "0008,0022", // Acquisition Date
+    "0008,0023", // Content Date
+    "0008,002A", // Acquisition DateTime
+    "0008,0030", // Study Time
+    "0008,0031", // Series Time
+    "0008,0032", // Acquisition Time
+    "0008,0033", // Content Time
+    "0018,1200", // Date of Last Calibration
+    "0018,1201", // Time of Last Calibration
+    "0018,1203", // Calibration DateTime
+    "0038,001C", // Scheduled Discharge Date
+    "0038,001D", // Scheduled Discharge Time
+    "0040,0244", // Performed Procedure Step Start Date
+    "0040,0245", // Performed Procedure Step Start Time
+    "0040,0250", // Performed Procedure Step End Date
+    "0040,0251", // Performed Procedure Step End Time
+];
+
 /// The base profile rules as `(tag, action)` pairs.
 pub fn base_rules() -> Vec<(Tag, Action)> {
     BASE.iter()
@@ -146,6 +175,12 @@ pub fn base_rules() -> Vec<(Tag, Action)> {
 pub fn effective_rules(cfg: &Config) -> Result<Vec<(Tag, Action)>> {
     use std::collections::BTreeMap;
     let mut map: BTreeMap<Tag, Action> = base_rules().into_iter().collect();
+    // Conservative: retain demographics and dates/times verbatim.
+    if cfg.profile.strategy == Strategy::Conservative {
+        for t in CONSERVATIVE_RETAIN {
+            map.insert(parse_tag(t)?, Action::K);
+        }
+    }
     // Option-dependent rule adjustments go here; the MVP keeps the base table.
     let _ = (
         cfg.profile.retain_safe_private,
@@ -255,5 +290,41 @@ mod tests {
             let tag = parse_tag(t).unwrap();
             assert_eq!(m.get(&tag), Some(&a), "missing/wrong rule for {t}");
         }
+    }
+
+    #[test]
+    fn conservative_retains_demographics_and_dates_but_clears_identifiers() {
+        use crate::config::parse_tag;
+        let cfg = Config::from_toml_str("[profile]\nstrategy = \"conservative\"\n").unwrap();
+        let m = rule_map(&cfg);
+        for t in [
+            "0010,0040", // Patient's Sex
+            "0010,1010", // Patient's Age
+            "0010,1020", // Patient's Size
+            "0010,1030", // Patient's Weight
+            "0008,0020", // Study Date
+            "0008,0032", // Acquisition Time
+            "0008,002A", // Acquisition DateTime
+            "0008,0013", // Instance Creation Time
+        ] {
+            assert_eq!(m[&parse_tag(t).unwrap()], Action::K, "{t} should be retained");
+        }
+        // direct identifiers still cleared
+        assert_eq!(m[&parse_tag("0010,0010").unwrap()], Action::Z); // Name
+        assert_eq!(m[&parse_tag("0010,0020").unwrap()], Action::Z); // ID
+        assert_eq!(m[&parse_tag("0010,0030").unwrap()], Action::Z); // Birth Date
+        assert_eq!(m[&parse_tag("0008,0050").unwrap()], Action::Z); // Accession
+        assert_eq!(m[&parse_tag("0008,0080").unwrap()], Action::X); // Institution
+        assert_eq!(m[&parse_tag("0008,1010").unwrap()], Action::X); // Station Name
+    }
+
+    #[test]
+    fn aggressive_clears_demographics_and_dates() {
+        use crate::config::parse_tag;
+        let m = rule_map(&Config::default());
+        assert_ne!(m[&parse_tag("0010,0040").unwrap()], Action::K);
+        assert_ne!(m[&parse_tag("0010,1010").unwrap()], Action::K);
+        assert_ne!(m[&parse_tag("0008,0020").unwrap()], Action::K);
+        assert_ne!(m[&parse_tag("0008,0032").unwrap()], Action::K);
     }
 }
