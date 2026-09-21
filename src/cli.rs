@@ -4,7 +4,11 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
-#[command(name = "dicom-anonymizer", about = "Bulk DICOM de-identification")]
+#[command(
+    name = "dicom-anonymizer",
+    version,
+    about = "Bulk DICOM de-identification"
+)]
 pub struct Args {
     /// Input directory tree containing DICOM files.
     #[arg(short, long)]
@@ -57,5 +61,11 @@ mod tests {
         let a = Args::try_parse_from(["x", "-i", "in", "-o", "out", "--strategy", "conservative"])
             .unwrap();
         assert_eq!(a.strategy.as_deref(), Some("conservative"));
+    }
+
+    #[test]
+    fn exposes_a_version() {
+        use clap::CommandFactory;
+        assert!(Args::command().get_version().is_some());
     }
 }

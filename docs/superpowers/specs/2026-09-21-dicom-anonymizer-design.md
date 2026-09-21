@@ -128,6 +128,7 @@ dicom-anonymizer \
   and no files are produced.
 - `--fail-fast`: abort on the first per-file error.
 - `--verbose`: extra progress on stderr.
+- `--version` / `--help`: standard clap output.
 
 ## 7. Configuration
 
@@ -366,6 +367,8 @@ dicom-anonymizer/
   README.md
   dicom-anonymizer.example.toml
   .cargo/config.toml
+  .github/workflows/ci.yml  # fmt + clippy(-D warnings) + test + release build
+  .github/workflows/release.yml  # tag `v*` -> prebuilt binaries on a GitHub Release
   scripts/
     gen_e1_1.py            # regenerates src/deid/e1_1.rs from the standard
     setup-toolchain.sh      # recreates the local Windows toolchain shim
@@ -410,6 +413,11 @@ dicom-anonymizer/
 3. Every walked file yields exactly one audit record; `--dry-run` writes no files.
 4. Exit codes match §13.
 5. `cargo test` passes; the build is warning-free.
+6. CI (`.github/workflows/ci.yml`) passes on Linux/Windows/macOS: `cargo fmt --check`,
+   `cargo clippy --all-targets -- -D warnings`, `cargo test --locked`,
+   `cargo build --release --locked`. CI drops the host-specific `.cargo/config.toml`.
+7. Pushing a `v*` tag builds Linux (gnu), Windows (msvc) and macOS (arm64/x86_64)
+   release archives and attaches them to a GitHub Release.
 
 ## 20. Implementation deltas from the approved plan
 

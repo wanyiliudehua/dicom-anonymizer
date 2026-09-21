@@ -1,5 +1,8 @@
 # dicom-anonymizer
 
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+<!-- Replace OWNER/REPO above with your GitHub slug once the remote is set. -->
+
 Standalone Rust CLI for bulk DICOM de-identification (PS3.15 Basic Application
 Level Confidentiality Profile + options), with tag-driven burned-in pixel masking.
 
