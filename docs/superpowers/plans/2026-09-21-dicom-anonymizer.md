@@ -1,5 +1,11 @@
 # dicom-anonymizer Implementation Plan
 
+> **Status: fully executed - this document is history, not a tracker.** All 15 tasks below
+> were delivered during the first implementation sessions. Do not read the checkboxes here
+> (or any parallel todo list) as progress: they were never maintained and drifted out of
+> date, ending up showing 15/15 unfinished after everything had shipped. The single source of
+> truth for what the tool does and what changed is `CHANGELOG.md` plus `git log`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a standalone Rust CLI that de-identifies DICOM files in bulk — PS3.15 tag removal/replacement, configured burned-in pixel masking, mirrored output, and a JSON audit trail.
