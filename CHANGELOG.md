@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `[output] non_dicom = "skip" | "error"`. Sidecars (the sample dataset ships a CloudPACS
+  XML) were dropped from the output tree with only a `skipped` line; `"error"` records a
+  per-file error instead, so a run that drops a file cannot report success and `run.json`
+  says `partial`. There is deliberately **no copy mode**: a de-identification tool must not
+  put an un-de-identified file into the tree it certifies, so de-identify the sidecar
+  separately and `--verify` it.
 - `[limits] max_input_bytes`, a guard against exhausting memory (default 2 GiB, `0`
   disables). Each file is held whole, so peak usage is several times the largest file size
   times the jobs in flight; an oversized input is now refused **before it is read** and

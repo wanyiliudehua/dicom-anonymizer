@@ -33,6 +33,7 @@ on_missing_burnedin = "warn"         # warn | skip | mask_all
 [output]
 filename = "sop_instance_uid"        # sop_instance_uid | preserve
 layout = "mirror"                   # mirror | series (one dir per remapped series UID)
+non_dicom = "skip"                   # skip | error (copying is deliberately not offered)
 
 [limits]
 max_input_bytes = 2147483648         # refuse larger inputs (0 = no limit)

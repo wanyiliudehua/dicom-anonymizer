@@ -180,6 +180,7 @@ salt = ""                              # empty => random per run
 [output]
 filename = "sop_instance_uid"          # sop_instance_uid | preserve
 layout = "mirror"                     # mirror | series (one dir per remapped series UID)
+non_dicom = "skip"                     # skip | error (copying is deliberately not offered)
 
 [limits]
 max_input_bytes = 2147483648           # refuse larger inputs (0 = no limit)
@@ -332,6 +333,10 @@ Returns a `PixelReport { regions_masked, samples_masked }`.
 
 - Recursively walk `--input`; a file is DICOM when bytes 128..132 equal `DICM`.
 - **Every** file becomes a job; non-DICOM files are logged as `skipped` and not written.
+  `[output] non_dicom = "error"` records a per-file `error` instead, so a run that drops
+  files cannot report success. Copying is deliberately not offered: putting an
+  un-de-identified file into the output tree would contradict what the run certifies.
+  Verified non-DICOM files are not silently discarded by `--verify`, which scans them.
 - DICOMDIR is detected from the file meta `Media Storage SOP Class UID (0002,0002)`
   (fallback: dataset `(0008,0016)`) and logged as `skipped_dicomdir`.
 - The output directory mirrors the input tree. By default each file is renamed to
@@ -537,6 +542,11 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   instead of dataset-only serialization, so outputs stay reopenable.
 - **De-identification markers** `(0012,0062)`/`(0012,0063)` are written.
 - **`PixelReport`** separates `regions_masked` from `samples_masked`.
+- **`[output] non_dicom = "skip" | "error"`** was added beyond the plan. The sample
+  dataset ships a sidecar XML, so the default silently dropped it from the output tree;
+  the option lets a run insist on being told. No `copy` mode exists on purpose - a
+  de-identification tool must not copy an un-de-identified file into its own output, and
+  `--verify` now covers sidecars separately.
 - **Non-DICOM files** are audited as `skipped`; unrecoverable transfer syntaxes as
   `unsupported`.
 - **Date shift** is gated on `retain_longitudinal_temporal`; `D` is VR-aware; dates are

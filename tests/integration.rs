@@ -747,6 +747,51 @@ fn verify_scans_non_dicom_sidecar_files() {
 }
 
 #[test]
+fn non_dicom_error_mode_fails_instead_of_dropping_the_file() {
+    // A run that drops a file from the output tree should be able to say so loudly
+    // rather than reporting success while the tree is missing something.
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    std::fs::write(
+        src.path().join("study.xml"),
+        "<Study><Patient>Doe^John</Patient></Study>",
+    )
+    .unwrap();
+
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[output]\nnon_dicom = \"error\"\n").unwrap();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
+        .assert()
+        .failure();
+
+    let audit = std::fs::read_to_string(out.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"status\":\"error\""), "{audit}");
+    assert!(audit.contains("study.xml"), "{audit}");
+    // the message has to name the setting, or the user cannot act on it
+    assert!(audit.contains("non_dicom"), "{audit}");
+
+    let marker = std::fs::read_to_string(out.path().join("run.json")).unwrap();
+    assert!(marker.contains("\"outcome\": \"partial\""), "{marker}");
+
+    // The DICOM file is still processed: the error is per-file, not fatal to the batch.
+    let wrote_dicom = std::fs::read_dir(out.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .any(|e| e.path().extension().map(|x| x == "dcm").unwrap_or(false));
+    assert!(wrote_dicom, "the DICOM should still be anonymised");
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

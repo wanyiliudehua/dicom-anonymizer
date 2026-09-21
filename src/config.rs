@@ -86,11 +86,28 @@ pub enum Layout {
     Series,
 }
 
+/// What to do with files that are not DICOM.
+///
+/// Copying them is deliberately not offered. A de-identification tool must not put an
+/// un-de-identified file into the tree it is certifying as clean, so the only choice is
+/// whether dropping the file is silent or loud. De-identify a sidecar separately and
+/// `--verify` the result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NonDicom {
+    /// Log it as `skipped` and leave it out of the output tree (default).
+    #[default]
+    Skip,
+    /// Record a per-file `error`, so a run that drops files cannot look successful.
+    Error,
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default)]
 pub struct Output {
     pub filename: FilenameMode,
     pub layout: Layout,
+    pub non_dicom: NonDicom,
 }
 
 impl Default for Output {
@@ -98,6 +115,7 @@ impl Default for Output {
         Output {
             filename: FilenameMode::SopInstanceUid,
             layout: Layout::Mirror,
+            non_dicom: NonDicom::Skip,
         }
     }
 }
@@ -506,6 +524,17 @@ mod tests {
     fn rejects_invalid_uid_root_when_remapping() {
         let c = Config::from_toml_str("[uids]\nstrategy = \"remap\"\nroot = \"abc\"\n").unwrap();
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn non_dicom_defaults_to_skip_and_can_error() {
+        let c = Config::from_toml_str("").unwrap();
+        assert_eq!(c.output.non_dicom, NonDicom::Skip);
+        let c2 = Config::from_toml_str("[output]\nnon_dicom = \"error\"\n").unwrap();
+        assert_eq!(c2.output.non_dicom, NonDicom::Error);
+        // and it does not disturb the neighbouring keys
+        assert_eq!(c2.output.filename, FilenameMode::SopInstanceUid);
+        assert_eq!(c2.output.layout, Layout::Mirror);
     }
 
     #[test]

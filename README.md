@@ -118,7 +118,12 @@ the marker that separates the two: if it is absent, the run did not finish.** `o
 is `partial` when any file was left un-anonymised, and `audit_complete` is `false` when
 the audit sink itself failed, so records may be missing. `--verify` prints the marker
 when it finds one, and says so when it does not.
-Non-DICOM files are logged with `status: skipped`; a file whose transfer syntax
+Non-DICOM files are logged with `status: skipped` and left out of the output tree. Set
+`[output] non_dicom = "error"` to make dropping one fail the run instead, so a tree that
+is missing a file cannot be reported as complete. There is deliberately **no copy mode**:
+a de-identification tool must not put an un-de-identified sidecar into the tree it is
+certifying as clean — de-identify it separately and `--verify` the result. A file whose
+transfer syntax
 cannot be decoded (e.g. JPEG-LS without `--features charls`) is logged with
 `status: unsupported` and the batch continues. Exit codes: `0` success,
 `1` partial failure, `2` fatal error.

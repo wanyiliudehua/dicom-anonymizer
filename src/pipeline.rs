@@ -1,7 +1,7 @@
 //! Per-file pipeline: parse, de-identify tags, mask pixels, write, audit.
 
 use crate::audit::{self, Record, Status};
-use crate::config::{Config, FilenameMode, Layout};
+use crate::config::{Config, FilenameMode, Layout, NonDicom};
 use crate::deid::actions::{apply, DeidContext};
 use crate::deid::dataset as ds;
 use crate::deid::dates::DateShifter;
@@ -74,9 +74,18 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
     let start = Instant::now();
     let input_str = rel_str(&job.rel);
 
-    // Non-DICOM files are logged as skipped (spec §11).
+    // Non-DICOM files are never copied: putting an un-de-identified file into the tree
+    // would undermine the point of the run, so the only decision is whether dropping it
+    // is silent or loud (spec §11).
     if !job.dicom {
-        let rec = Record::skipped(input_str, Status::Skipped);
+        let rec = match shared.cfg.output.non_dicom {
+            NonDicom::Skip => Record::skipped(input_str, Status::Skipped),
+            NonDicom::Error => Record::error(
+                input_str,
+                "not a DICOM file, and output.non_dicom = \"error\": it would be \
+                 dropped from the output tree",
+            ),
+        };
         emit(log, &rec);
         return Ok(rec);
     }
