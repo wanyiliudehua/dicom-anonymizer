@@ -87,23 +87,51 @@ fn run() -> i32 {
     };
 
     let mut summary = report::Summary::default();
-    for job in &jobs {
-        let mut line = Vec::new();
-        match pipeline::process_job(&shared, job, &mut line) {
-            Ok(rec) => {
-                summary.count(rec.status);
-                let _ = log.write_all(&line);
-                if args.fail_fast && rec.status == audit::Status::Error {
-                    break;
+    if args.fail_fast || args.jobs.unwrap_or(0) == 0 {
+        for job in &jobs {
+            let mut line = Vec::new();
+            match pipeline::process_job(&shared, job, &mut line) {
+                Ok(rec) => {
+                    summary.count(rec.status);
+                    let _ = log.write_all(&line);
+                    if args.fail_fast && rec.status == audit::Status::Error {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    summary.count(audit::Status::Error);
+                    eprintln!("error: {}: {e}", job.rel.display());
+                    if args.fail_fast {
+                        break;
+                    }
                 }
             }
-            Err(e) => {
-                summary.count(audit::Status::Error);
-                eprintln!("error: {}: {e}", job.rel.display());
-                if args.fail_fast {
-                    break;
+        }
+    } else {
+        use rayon::prelude::*;
+        if let Some(n) = args.jobs {
+            let _ = rayon::ThreadPoolBuilder::new().num_threads(n).build_global();
+        }
+        // `Shared` is immutable, and UID/date mapping are pure functions, so
+        // file processing parallelizes without any shared mutable state.
+        let results: Vec<(report::Summary, Vec<u8>)> = jobs
+            .par_iter()
+            .map(|job| {
+                let mut line = Vec::new();
+                let mut s = report::Summary::default();
+                match pipeline::process_job(&shared, job, &mut line) {
+                    Ok(rec) => s.count(rec.status),
+                    Err(_) => s.count(audit::Status::Error),
                 }
-            }
+                (s, line)
+            })
+            .collect();
+        for (s, line) in &results {
+            summary.ok += s.ok;
+            summary.skipped += s.skipped;
+            summary.unsupported += s.unsupported;
+            summary.error += s.error;
+            let _ = log.write_all(line);
         }
     }
 
