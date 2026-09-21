@@ -66,6 +66,9 @@ to keep. Repeating-group rows that cannot be a single tag — Curve Data
 `(50xx,xxxx)`, Overlay Data/Comments `(60xx,3000|4000)` — are handled as ranges,
 and private (odd-group) tags are always removed.
 
+De-identified objects carry the PS3.15 markers `(0012,0062) Patient Identity
+Removed = "YES"` and `(0012,0063) De-identification Method`.
+
 Date shifting is applied with `[profile] retain_longitudinal_temporal = true`
 (the E.1-1 *Retain Longitudinal Temporal Information — Modified Dates* option:
 dates are shifted, times kept); `retain_longitudinal_full_dates = true` keeps

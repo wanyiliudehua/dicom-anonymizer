@@ -18,7 +18,7 @@ pub struct Args {
     /// De-identification strategy: `conservative` or `aggressive`.
     #[arg(long)]
     pub strategy: Option<String>,
-    /// Worker threads (default: logical CPU count).
+    /// Worker threads (default: all logical CPUs; `1` runs sequentially).
     #[arg(short, long)]
     pub jobs: Option<usize>,
     /// Run everything except writes; audit records go to stdout.

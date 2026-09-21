@@ -106,7 +106,7 @@ fn run() -> i32 {
 
     let mut audit_failed = false;
     let mut summary = report::Summary::default();
-    if args.fail_fast || args.jobs.unwrap_or(0) == 0 {
+    if args.fail_fast || args.jobs == Some(1) {
         for job in &jobs {
             let mut line = Vec::new();
             match pipeline::process_job(&shared, job, &mut line) {

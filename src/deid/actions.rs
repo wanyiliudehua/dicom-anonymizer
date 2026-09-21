@@ -164,16 +164,27 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
 /// Recurse into an SQ element, mutating items in place. Returns changed count.
 fn apply_to_sequence(obj: &mut InMemDicomObject, tag: Tag, ctx: &DeidContext) -> Result<usize> {
     let mut changed = 0usize;
+    let mut failure: Option<AnonError> = None;
     obj.update_value_at(tag, |value| {
+        if failure.is_some() {
+            return;
+        }
         if let Value::Sequence(seq) = value {
             for item in seq.items_mut() {
-                if let Ok(n) = apply(item, ctx) {
-                    changed += n;
+                match apply(item, ctx) {
+                    Ok(n) => changed += n,
+                    Err(e) => {
+                        failure = Some(e);
+                        break;
+                    }
                 }
             }
         }
     })
     .map_err(|e| AnonError::Dicom(format!("sequence {tag:?}: {e}")))?;
+    if let Some(e) = failure {
+        return Err(e);
+    }
     Ok(changed)
 }
 

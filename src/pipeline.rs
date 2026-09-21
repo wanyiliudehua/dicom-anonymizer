@@ -10,6 +10,7 @@ use crate::discovery::Job;
 use crate::error::{AnonError, Result};
 use crate::pixel::stage;
 use crate::writer;
+use dicom_core::{Tag, VR};
 use dicom_object::InMemDicomObject;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -104,6 +105,15 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
             obj.update_meta(|m| m.media_storage_sop_instance_uid = new_sop.clone());
         }
     }
+
+    // PS3.15 de-identification markers.
+    ds::set_string(&mut obj, Tag(0x0012, 0x0062), VR::CS, "YES");
+    ds::set_string(
+        &mut obj,
+        Tag(0x0012, 0x0063),
+        VR::LO,
+        "PS3.15 Basic Application Level Confidentiality Profile",
+    );
 
     let report = match stage::process(&mut obj, &shared.cfg) {
         Ok(r) => r,
@@ -317,6 +327,33 @@ mod tests {
             written.file_name().unwrap().to_string_lossy(),
             format!("{new_sop}.dcm")
         );
+    }
+
+    #[test]
+    fn writes_deidentification_markers() {
+        use crate::audit::Status;
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let inpath = src.path().join("p.dcm");
+        make_dicom(&inpath);
+        let shared = Shared {
+            cfg: crate::config::Config::default(),
+            uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
+            dates: crate::deid::dates::DateShifter::new(b"s", 10),
+            out_root: out.path().to_path_buf(),
+            dry_run: false,
+        };
+        let job = Job { input: inpath, rel: "p.dcm".into(), dicom: true };
+        let mut sink = Vec::new();
+        let rec = process_job(&shared, &job, &mut sink).unwrap();
+        assert_eq!(rec.status, Status::Ok);
+        let written = out.path().join(rec.output.unwrap());
+        let o = dicom_object::open_file(&written).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0012, 0x0062)).as_deref(),
+            Some("YES")
+        );
+        assert!(crate::deid::dataset::get_string(&o, Tag(0x0012, 0x0063)).is_some());
     }
 
     #[test]

@@ -23,11 +23,6 @@ pub fn get_string(obj: &InMemDicomObject, tag: Tag) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// Alias kept for readability at call sites dealing with single-valued tags.
-pub fn first_value_string(obj: &InMemDicomObject, tag: Tag) -> Option<String> {
-    get_string(obj, tag)
-}
-
 /// Replace (or insert) a string-valued element.
 pub fn set_string(obj: &mut InMemDicomObject, tag: Tag, vr: VR, value: &str) {
     obj.put_element(DataElement::new(tag, vr, value.to_string()));
