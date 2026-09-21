@@ -278,11 +278,42 @@ fn hash_hex(salt: &str, value: &str) -> String {
     format!("{:x}", h.finalize())
 }
 
-/// Depth-first visit of every element, including values nested in sequences.
+/// Whether a value representation holds human-readable text.
+///
+/// Scanning has to be gated on the VR rather than on `to_str()` succeeding, because
+/// `to_str()` stringifies *any* primitive - pixel data included. Rendering 871 KB of
+/// pixels per image costs about six seconds a file on the real sample and can never
+/// match an identifier, since pixels are not text.
+fn is_text_vr(vr: VR) -> bool {
+    matches!(
+        vr,
+        VR::AE
+            | VR::AS
+            | VR::CS
+            | VR::DA
+            | VR::DS
+            | VR::DT
+            | VR::IS
+            | VR::LO
+            | VR::LT
+            | VR::PN
+            | VR::SH
+            | VR::ST
+            | VR::TM
+            | VR::UC
+            | VR::UI
+            | VR::UR
+            | VR::UT
+    )
+}
+
+/// Depth-first visit of every text element, including values nested in sequences.
 fn visit(obj: &InMemDicomObject, f: &mut impl FnMut(Tag, VR, &str)) {
     for e in obj.iter() {
-        if let Ok(s) = e.to_str() {
-            f(e.tag(), e.vr(), &s);
+        if is_text_vr(e.vr()) {
+            if let Ok(s) = e.to_str() {
+                f(e.tag(), e.vr(), &s);
+            }
         }
         if let Some(items) = e.value().items() {
             for item in items {
@@ -583,6 +614,66 @@ mod tests {
         );
         let fp = fingerprint(&["1.2.3.4".to_string()], "pepper");
         assert!(scan_fingerprint(d.path(), &fp).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_walker_does_not_yield_binary_values_as_text() {
+        // `to_str()` stringifies *any* primitive (dicom-core: `prim => prim.to_string()`),
+        // so a walk that trusts it hands ~871 KB of rendered pixel data per file to the
+        // matcher - about 6 s per file on the real sample, i.e. minutes per batch. Pixels
+        // are not text and can never carry an identifier, so they must not be scanned.
+        let d = tempfile::tempdir().unwrap();
+        let [a, b] = sop();
+        use dicom_core::value::PrimitiveValue;
+        let pixels: Vec<u8> = vec![0x5A; 4096];
+        write_file(
+            &d.path().join("x.dcm"),
+            InMemDicomObject::from_element_iter([
+                a,
+                b,
+                DataElement::new(Tag(0x0008, 0x1030), VR::LO, "l-spine"),
+                DataElement::new(Tag(0x7FE0, 0x0010), VR::OW, PrimitiveValue::from(pixels)),
+            ]),
+        );
+
+        let mut seen = Vec::new();
+        for_each_text_value(d.path(), &mut |_file, tag, _vr, _text| seen.push(tag)).unwrap();
+
+        assert!(
+            !seen.contains(&Tag(0x7FE0, 0x0010)),
+            "binary values must not be yielded as text: {seen:?}"
+        );
+        assert!(
+            seen.contains(&Tag(0x0008, 0x1030)),
+            "text values must still be yielded: {seen:?}"
+        );
+    }
+
+    #[test]
+    fn scan_does_not_treat_binary_values_as_text() {
+        // `to_str()` succeeds on OW pixel data - the library renders the words as a
+        // string - so a walk that trusts `to_str()` hands the entire image buffer to
+        // the matcher. That is orders of magnitude slower than reading the text, and
+        // it can only ever produce false positives, because pixels are not text.
+        let d = tempfile::tempdir().unwrap();
+        let [a, b] = sop();
+        use dicom_core::value::PrimitiveValue;
+        let pixels: Vec<u8> = b"Doe".iter().cycle().take(4096).copied().collect();
+        write_file(
+            &d.path().join("x.dcm"),
+            InMemDicomObject::from_element_iter([
+                a,
+                b,
+                DataElement::new(Tag(0x7FE0, 0x0010), VR::OW, PrimitiveValue::from(pixels)),
+            ]),
+        );
+
+        let fp = fingerprint(&["Doe".to_string()], "pepper");
+        let hits = scan_fingerprint(d.path(), &fp).unwrap();
+        assert!(
+            hits.is_empty(),
+            "binary values must not be scanned as text: {hits:?}"
+        );
     }
 
     #[test]
