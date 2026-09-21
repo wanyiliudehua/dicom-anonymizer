@@ -1,7 +1,7 @@
 //! Per-file pipeline: parse, de-identify tags, mask pixels, write, audit.
 
 use crate::audit::{self, Record, Status};
-use crate::config::Config;
+use crate::config::{Config, FilenameMode};
 use crate::deid::actions::{apply, DeidContext};
 use crate::deid::dates::DateShifter;
 use crate::deid::dataset as ds;
@@ -90,6 +90,14 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     };
 
+    // Keep the file meta's Media Storage SOP Instance UID consistent with the
+    // (remapped) dataset SOP Instance UID.
+    if let Some(new_sop) = ds::get_string(&obj, dicom_dictionary_std::tags::SOP_INSTANCE_UID) {
+        if !new_sop.is_empty() {
+            obj.update_meta(|m| m.media_storage_sop_instance_uid = new_sop.clone());
+        }
+    }
+
     let regions_masked = match stage::process(&mut obj, &shared.cfg) {
         Ok(n) => n,
         Err(e) => {
@@ -99,7 +107,18 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         }
     };
 
-    let mut rec = Record::ok(input_str, rel_str(&job.rel), tags_changed, regions_masked);
+    let out_rel = match shared.cfg.output.filename {
+        FilenameMode::Preserve => job.rel.clone(),
+        FilenameMode::SopInstanceUid => {
+            let new_sop = ds::get_string(&obj, dicom_dictionary_std::tags::SOP_INSTANCE_UID);
+            match new_sop.filter(|s| !s.is_empty()) {
+                Some(uid) => job.rel.with_file_name(format!("{uid}.dcm")),
+                None => job.rel.clone(),
+            }
+        }
+    };
+
+    let mut rec = Record::ok(input_str, rel_str(&out_rel), tags_changed, regions_masked);
     rec.transfer_syntax_in = Some(ts_in);
     rec.transfer_syntax_out = Some(obj.meta().transfer_syntax().to_string());
     rec.duration_ms = start.elapsed().as_millis();
@@ -110,10 +129,10 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         return Ok(rec);
     }
 
-    let target = writer::output_path(&shared.out_root, &job.rel);
+    let target = writer::output_path(&shared.out_root, &out_rel);
     if let Some(parent) = target.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            let rec = Record::error(rel_str(&job.rel), format!("mkdir: {e}"));
+            let rec = Record::error(rel_str(&out_rel), format!("mkdir: {e}"));
             emit(log, &rec);
             return Ok(rec);
         }
@@ -124,13 +143,13 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
     let tmp = temp_path(&target);
     if let Err(e) = obj.write_to_file(&tmp) {
         let _ = std::fs::remove_file(&tmp);
-        let rec = Record::error(rel_str(&job.rel), format!("write: {e}"));
+        let rec = Record::error(rel_str(&out_rel), format!("write: {e}"));
         emit(log, &rec);
         return Ok(rec);
     }
     if let Err(e) = std::fs::rename(&tmp, &target) {
         let _ = std::fs::remove_file(&tmp);
-        let rec = Record::error(rel_str(&job.rel), format!("rename: {e}"));
+        let rec = Record::error(rel_str(&out_rel), format!("rename: {e}"));
         emit(log, &rec);
         return Ok(rec);
     }
@@ -158,6 +177,8 @@ mod tests {
         let obj = InMemDicomObject::from_element_iter([
             DataElement::new(Tag(0x0010, 0x0010), VR::PN, "Doe^John"),
             DataElement::new(Tag(0x0020, 0x000D), VR::UI, "1.2.3"),
+            DataElement::new(Tag(0x0008, 0x0016), VR::UI, "1.2.840.10008.5.1.4.1.1.7"),
+            DataElement::new(Tag(0x0008, 0x0018), VR::UI, "1.2.840.10008.1.2.3"),
         ]);
         let file = obj
             .with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
@@ -172,7 +193,10 @@ mod tests {
         let inpath = src.path().join("p.dcm");
         make_dicom(&inpath);
 
-        let cfg = crate::config::Config::from_toml_str("[dates]\nstrategy = \"zero\"\n").unwrap();
+        let cfg = crate::config::Config::from_toml_str(
+            "[dates]\nstrategy = \"zero\"\n[output]\nfilename = \"preserve\"\n",
+        )
+        .unwrap();
         let shared = Shared {
             cfg,
             uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
@@ -235,5 +259,72 @@ mod tests {
             )
             .unwrap();
         assert!(!is_dicomdir(&not_dir));
+    }
+
+    #[test]
+    fn renames_output_to_new_sop_instance_uid_and_syncs_meta() {
+        use crate::audit::Status;
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let inpath = src.path().join("orig-name.dcm");
+        make_dicom(&inpath);
+        let shared = Shared {
+            cfg: crate::config::Config::default(),
+            uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
+            dates: crate::deid::dates::DateShifter::new(b"s", 10),
+            out_root: out.path().to_path_buf(),
+            dry_run: false,
+        };
+        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into() };
+        let mut sink = Vec::new();
+        let rec = process_job(&shared, &job, &mut sink).unwrap();
+        assert_eq!(rec.status, Status::Ok);
+
+        let written = out.path().join(rec.output.clone().unwrap());
+        assert!(written.exists(), "output {written:?} missing");
+        // directory preserved
+        assert!(written.parent().unwrap().ends_with("sub"));
+
+        let o = dicom_object::open_file(&written).unwrap();
+        let new_sop = o
+            .element(Tag(0x0008, 0x0018))
+            .ok()
+            .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
+            .unwrap();
+        assert_ne!(new_sop, "1.2.840.10008.1.2.3");
+        assert!(new_sop.starts_with("2.25."));
+        // file meta must match the dataset instance UID
+        assert_eq!(o.meta().media_storage_sop_instance_uid(), new_sop);
+        // filename is the new UID
+        assert_eq!(
+            written.file_name().unwrap().to_string_lossy(),
+            format!("{new_sop}.dcm")
+        );
+    }
+
+    #[test]
+    fn preserve_mode_keeps_relative_name() {
+        use crate::audit::Status;
+        let src = tempfile::tempdir().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let inpath = src.path().join("orig-name.dcm");
+        make_dicom(&inpath);
+        let cfg = crate::config::Config::from_toml_str(
+            "[output]\nfilename = \"preserve\"\n",
+        )
+        .unwrap();
+        let shared = Shared {
+            cfg,
+            uids: crate::deid::uids::UidMapper::new("2.25.", b"s"),
+            dates: crate::deid::dates::DateShifter::new(b"s", 10),
+            out_root: out.path().to_path_buf(),
+            dry_run: false,
+        };
+        let job = Job { input: inpath, rel: "sub/orig-name.dcm".into() };
+        let mut sink = Vec::new();
+        let rec = process_job(&shared, &job, &mut sink).unwrap();
+        assert_eq!(rec.status, Status::Ok);
+        assert!(out.path().join("sub/orig-name.dcm").exists());
+        assert_eq!(rec.output.as_deref(), Some("sub/orig-name.dcm"));
     }
 }

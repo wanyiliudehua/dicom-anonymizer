@@ -11,12 +11,18 @@ fn end_to_end_mirrors_tree_and_deidentifies() {
     common::write_fixture(&src.path().join("b/two.dcm"), "Roe^Jane", "1.2.3");
     std::fs::write(src.path().join("b/notes.txt"), b"ignore me").unwrap();
 
+    let cfg_dir = tempfile::tempdir().unwrap();
+    let cfg_path = cfg_dir.path().join("anon.toml");
+    std::fs::write(&cfg_path, "[output]\nfilename = \"preserve\"\n").unwrap();
+
     Command::cargo_bin("dicom-anonymizer")
         .unwrap()
         .args(["-i"])
         .arg(src.path())
         .args(["-o"])
         .arg(out.path())
+        .args(["--config"])
+        .arg(&cfg_path)
         .assert()
         .success();
 
@@ -78,4 +84,39 @@ fn empty_input_is_success() {
         .arg(out.path())
         .assert()
         .success();
+}
+
+#[test]
+fn default_output_names_use_new_sop_instance_uid() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("a/one.dcm"), "Doe^John", "1.2.3");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .assert()
+        .success();
+
+    // original filename is gone; directory is preserved
+    assert!(!out.path().join("a/one.dcm").exists());
+    let entries: Vec<_> = std::fs::read_dir(out.path().join("a"))
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(entries.len(), 1);
+    let name = entries[0].file_name().to_string_lossy().to_string();
+    assert!(name.starts_with("2.25.") && name.ends_with(".dcm"), "unexpected name {name}");
+
+    let o = dicom_object::open_file(out.path().join("a").join(&name)).unwrap();
+    let sop = o
+        .element(dicom_dictionary_std::tags::SOP_INSTANCE_UID)
+        .ok()
+        .and_then(|e| e.to_str().ok().map(|s| s.to_string()))
+        .unwrap();
+    assert_eq!(format!("{sop}.dcm"), name);
+    assert_eq!(o.meta().media_storage_sop_instance_uid(), sop);
 }

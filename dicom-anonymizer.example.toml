@@ -21,6 +21,9 @@ mode = "mask"                        # mask | keep
 fill = 0                             # 0 | 255 | "max"
 on_missing_burnedin = "warn"         # warn | skip | mask_all
 
+[output]
+filename = "sop_instance_uid"        # sop_instance_uid | preserve
+
 # [[pixels.regions]]
 # modality = "US"
 # shape = "rect"

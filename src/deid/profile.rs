@@ -29,6 +29,10 @@ const BASE: &[(&str, Action)] = &[
     ("0008,1060", Action::X), // Name of Physician(s) Reading Study
     ("0008,1070", Action::X), // Operators' Name
     ("0008,1080", Action::X), // Admitting Diagnoses Description
+    ("0008,0016", Action::K), // SOP Class UID (identifies the IOD, kept)
+    ("0008,0018", Action::U), // SOP Instance UID
+    ("0008,1030", Action::X), // Study Description
+    ("0008,103E", Action::X), // Series Description
     ("0008,1155", Action::U), // Referenced SOP Instance UID
     ("0010,0010", Action::Z), // Patient's Name
     ("0010,0020", Action::Z), // Patient ID
@@ -128,5 +132,13 @@ mod tests {
         let cfg = Config::from_toml_str("[profile]\nbase = \"research\"\n").unwrap();
         let m = rule_map(&cfg);
         assert!(m.contains_key(&crate::config::parse_tag("0008,0020").unwrap()));
+    }
+
+    #[test]
+    fn covers_instance_uid_and_descriptions() {
+        let m = rule_map(&Config::default());
+        assert_eq!(m[&crate::config::parse_tag("0008,0018").unwrap()], Action::U);
+        assert_eq!(m[&crate::config::parse_tag("0008,1030").unwrap()], Action::X);
+        assert_eq!(m[&crate::config::parse_tag("0008,103E").unwrap()], Action::X);
     }
 }

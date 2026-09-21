@@ -36,10 +36,13 @@ See `dicom-anonymizer.example.toml` for all options.
 
 ## Output
 
-The output tree mirrors the input tree. `audit.jsonl` in the output directory
-has one JSON object per file (status, changed tag count, masked-region count,
-transfer syntaxes, output SHA-256). Exit codes: `0` success, `1` partial
-failure, `2` fatal error.
+The output tree mirrors the input tree. By default, each output file is renamed
+to its **remapped SOP Instance UID** (`[output] filename = "sop_instance_uid"`),
+so the original instance UID cannot leak through the filename; set
+`filename = "preserve"` to keep the original relative filenames. `audit.jsonl` in
+the output directory has one JSON object per file (status, changed tag count,
+masked-region count, transfer syntaxes, output SHA-256). Exit codes: `0` success,
+`1` partial failure, `2` fatal error.
 
 ## Limits
 

@@ -51,6 +51,27 @@ pub enum Shape {
     Polygon,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilenameMode {
+    SopInstanceUid,
+    Preserve,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct Output {
+    pub filename: FilenameMode,
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Output {
+            filename: FilenameMode::SopInstanceUid,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum FillValue {
@@ -241,6 +262,7 @@ pub struct Config {
     pub dates: Dates,
     pub uids: Uids,
     pub pixels: Pixels,
+    pub output: Output,
     pub tags: BTreeMap<String, Action>,
     pub dummies: BTreeMap<String, String>,
 }
@@ -421,5 +443,13 @@ mod tests {
     fn rejects_invalid_uid_root_when_remapping() {
         let c = Config::from_toml_str("[uids]\nstrategy = \"remap\"\nroot = \"abc\"\n").unwrap();
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn output_filename_defaults_to_sop_instance_uid_and_can_preserve() {
+        let c = Config::from_toml_str("").unwrap();
+        assert_eq!(c.output.filename, FilenameMode::SopInstanceUid);
+        let c2 = Config::from_toml_str("[output]\nfilename = \"preserve\"\n").unwrap();
+        assert_eq!(c2.output.filename, FilenameMode::Preserve);
     }
 }
