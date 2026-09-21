@@ -148,7 +148,9 @@ dicom-anonymizer \
   any surviving identifier; `--config` and `--output` are not required and not used, so
   a delivered tree can be audited without the originals or the original settings. Non-DICOM
   files are scanned as text line by line: a real CloudPACS export ships an XML dump of
-  every attribute beside the images, and a DICOM-only scan called such a tree clean.
+  every attribute beside the images, and a DICOM-only scan called such a tree clean. Only
+  **text VRs** are searched; binary values are counted and reported as *not searched* (see
+  `Coverage`), so the result is a bounded claim rather than a blanket all-clear.
 - `--output` is therefore optional at the clap level and validated manually: required in
   the default (anonymise) mode, unused by `--verify`.
 - `--require-complete`: with `--verify`, also require `run.json` to describe a complete
@@ -542,6 +544,8 @@ dicom-anonymizer/
     says `partial`, and accepts a finished one.
 11. `--verbose` emits a progress line with count, throughput and ETA; without it, and with
     stderr redirected, nothing extra is printed.
+12. `--verify` reports coverage: files searched, text values and bytes examined, and how
+    many non-text values were deliberately not searched.
 
 ## 20. Implementation deltas from the approved plan
 
@@ -604,6 +608,10 @@ with TDD; the following deviations were ruled and recorded in the execution ledg
   files line by line and reports a windowed snippet, so one hit inside a 90 KB single-line
   XML is actionable rather than a flood. This also made `--verify` strictly stronger than
   `--check-leaks`, which still inspects only the DICOM files a run wrote.
+- **`--verify` reporting its coverage** was added beyond the plan: once the scan was gated
+  on the VR, "0 hits" needed its scope stated, so a run reports files searched, text values
+  and bytes examined, and how many non-text values were skipped. On the sample tree that is
+  `5439 text value(s), 77.8 KB searched; 939 non-text value(s) not searched`.
 - **Progress reporting** was added beyond the plan: a batch can run for hours, and the
   only feedback used to be the closing summary. It is gated on `--verbose` or stderr being
   a terminal, so redirected output stays byte-identical to before.

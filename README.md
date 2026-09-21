@@ -90,6 +90,18 @@ A clean tree is not necessarily a finished one, so `--verify --require-complete`
 demands a `run.json` describing a complete run. A tree that is clean but unfinished then
 fails, which is what an acceptance step or a CI check actually wants to assert.
 
+Every run states its scope, because "0 hits" on its own does not say what was looked at:
+
+```
+verify: 0 hit(s) in 0 file(s), using 19 fingerprint(s) over ./out
+coverage: 69 DICOM + 2 text file(s); 5439 text value(s), 77.8 KB searched; 939 non-text value(s) not searched
+```
+
+Only **text** values are searched. Binary VRs such as pixel data are reported as *not
+searched* rather than being rendered and scanned: pixels cannot carry an identifier, and
+stringifying them (which `to_str()` happily does) cost about six seconds per image before
+this was fixed.
+
 See `dicom-anonymizer.example.toml` for all options.
 
 ## Output

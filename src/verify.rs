@@ -63,7 +63,9 @@ pub fn scan(root: &Path, ids: &[String]) -> Result<Vec<Leak>> {
         return Ok(leaks);
     }
 
-    for_each_text_value(root, &mut |file, tag, vr, text| {
+    // The in-run check does not report coverage; `--verify` does.
+    let mut coverage = Coverage::default();
+    for_each_text_value(root, &mut coverage, &mut |file, tag, vr, text| {
         // UIDs are remapped, not scrubbed: digits inside them are expected.
         if vr == VR::UI {
             return;
@@ -86,7 +88,11 @@ pub fn scan(root: &Path, ids: &[String]) -> Result<Vec<Leak>> {
 }
 
 /// Run `f` over every text value of every DICOM file under `root`.
-fn for_each_text_value(root: &Path, f: &mut impl FnMut(&str, Tag, VR, &str)) -> Result<()> {
+fn for_each_text_value(
+    root: &Path,
+    coverage: &mut Coverage,
+    f: &mut impl FnMut(&str, Tag, VR, &str),
+) -> Result<()> {
     for job in discovery::discover(root)? {
         if !job.dicom {
             continue;
@@ -94,8 +100,9 @@ fn for_each_text_value(root: &Path, f: &mut impl FnMut(&str, Tag, VR, &str)) -> 
         let Ok(obj) = dicom_object::open_file(&job.input) else {
             continue;
         };
+        coverage.dicom_files += 1;
         let file = job.rel.to_string_lossy().replace('\\', "/");
-        visit(&obj, &mut |tag, vr, text| f(&file, tag, vr, text));
+        visit(&obj, coverage, &mut |tag, vr, text| f(&file, tag, vr, text));
     }
     Ok(())
 }
@@ -183,16 +190,42 @@ pub struct FingerprintHit {
     pub matched: String,
 }
 
+/// What a scan actually looked at.
+///
+/// A clean result is only meaningful with its scope: "0 hits" says nothing about the
+/// pixel data that was never searched, and saying so is the difference between a bounded
+/// claim and a false assurance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Coverage {
+    /// DICOM files opened and searched.
+    pub dicom_files: usize,
+    /// Non-DICOM files read as text.
+    pub text_files: usize,
+    /// Text values examined.
+    pub values: usize,
+    /// Bytes of text examined.
+    pub bytes: usize,
+    /// Elements skipped because their VR is not textual (pixel data and friends).
+    pub skipped_binary: usize,
+}
+
+/// The result of a scan: what matched, and what was looked at.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Scan {
+    pub hits: Vec<FingerprintHit>,
+    pub coverage: Coverage,
+}
+
 /// Scan every DICOM file under `root` against a fingerprint.
-pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Vec<FingerprintHit>> {
-    let mut hits = Vec::new();
-    for_each_text_value(root, &mut |file, tag, vr, text| {
+pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Scan> {
+    let mut scan = Scan::default();
+    for_each_text_value(root, &mut scan.coverage, &mut |file, tag, vr, text| {
         // UIDs are remapped rather than scrubbed, so their digits are expected.
         if vr == VR::UI {
             return;
         }
         for matched in fp.hits(text) {
-            hits.push(FingerprintHit {
+            scan.hits.push(FingerprintHit {
                 file: file.to_string(),
                 location: Location::Tag(tag),
                 value: text.to_string(),
@@ -202,9 +235,9 @@ pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Vec<Fingerprint
     })?;
     // Sidecar files count too: nothing about "is this tree clean?" is answered by
     // looking only at the DICOM.
-    for_each_text_line(root, &mut |file, line, text| {
+    for_each_text_line(root, &mut scan.coverage, &mut |file, line, text| {
         for matched in fp.hits(text) {
-            hits.push(FingerprintHit {
+            scan.hits.push(FingerprintHit {
                 file: file.to_string(),
                 location: Location::Line(line),
                 value: snippet(text, &matched),
@@ -212,7 +245,7 @@ pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Vec<Fingerprint
             });
         }
     })?;
-    Ok(hits)
+    Ok(scan)
 }
 
 /// Run `f` over every line of every non-DICOM file under `root`.
@@ -221,7 +254,11 @@ pub fn scan_fingerprint(root: &Path, fp: &Fingerprint) -> Result<Vec<Fingerprint
 /// name and institution included - so scanning only DICOM files would report a tree full
 /// of identifiers as clean. Bytes are decoded lossily because the goal is to find ASCII
 /// identifiers, not to validate encodings.
-fn for_each_text_line(root: &Path, f: &mut impl FnMut(&str, usize, &str)) -> Result<()> {
+fn for_each_text_line(
+    root: &Path,
+    coverage: &mut Coverage,
+    f: &mut impl FnMut(&str, usize, &str),
+) -> Result<()> {
     for job in discovery::discover(root)? {
         if job.dicom {
             continue;
@@ -229,9 +266,12 @@ fn for_each_text_line(root: &Path, f: &mut impl FnMut(&str, usize, &str)) -> Res
         let Ok(bytes) = std::fs::read(&job.input) else {
             continue;
         };
+        coverage.text_files += 1;
+        coverage.bytes += bytes.len();
         let text = String::from_utf8_lossy(&bytes);
         let file = job.rel.to_string_lossy().replace('\\', "/");
         for (i, line) in text.lines().enumerate() {
+            coverage.values += 1;
             f(&file, i + 1, line);
         }
     }
@@ -308,16 +348,20 @@ fn is_text_vr(vr: VR) -> bool {
 }
 
 /// Depth-first visit of every text element, including values nested in sequences.
-fn visit(obj: &InMemDicomObject, f: &mut impl FnMut(Tag, VR, &str)) {
+fn visit(obj: &InMemDicomObject, coverage: &mut Coverage, f: &mut impl FnMut(Tag, VR, &str)) {
     for e in obj.iter() {
         if is_text_vr(e.vr()) {
             if let Ok(s) = e.to_str() {
+                coverage.values += 1;
+                coverage.bytes += s.len();
                 f(e.tag(), e.vr(), &s);
             }
+        } else {
+            coverage.skipped_binary += 1;
         }
         if let Some(items) = e.value().items() {
             for item in items {
-                visit(item, f);
+                visit(item, coverage, f);
             }
         }
     }
@@ -597,7 +641,7 @@ mod tests {
             ]),
         );
         let fp = fingerprint(&["YiJiShan".to_string()], "pepper");
-        let hits = scan_fingerprint(d.path(), &fp).unwrap();
+        let hits = scan_fingerprint(d.path(), &fp).unwrap().hits;
         assert_eq!(hits.len(), 1, "{hits:?}");
         assert_eq!(hits[0].location, Location::Tag(Tag(0x0008, 0x1030)));
         assert_eq!(hits[0].file, "x.dcm");
@@ -613,7 +657,40 @@ mod tests {
             InMemDicomObject::from_element_iter([a, b]),
         );
         let fp = fingerprint(&["1.2.3.4".to_string()], "pepper");
-        assert!(scan_fingerprint(d.path(), &fp).unwrap().is_empty());
+        assert!(scan_fingerprint(d.path(), &fp).unwrap().hits.is_empty());
+    }
+
+    #[test]
+    fn coverage_counts_what_was_searched_and_what_was_not() {
+        // "0 hits" only means something alongside its scope, so the scan reports how
+        // much text it read and how many values it deliberately did not read.
+        let d = tempfile::tempdir().unwrap();
+        let [a, b] = sop();
+        use dicom_core::value::PrimitiveValue;
+        write_file(
+            &d.path().join("x.dcm"),
+            InMemDicomObject::from_element_iter([
+                a,
+                b,
+                DataElement::new(Tag(0x0008, 0x1030), VR::LO, "l-spine"),
+                DataElement::new(
+                    Tag(0x7FE0, 0x0010),
+                    VR::OW,
+                    PrimitiveValue::from(vec![0x5A_u8; 64]),
+                ),
+            ]),
+        );
+        std::fs::write(d.path().join("notes.txt"), "line one\nline two\n").unwrap();
+
+        let fp = fingerprint(&["nobody".to_string()], "pepper");
+        let scan = scan_fingerprint(d.path(), &fp).unwrap();
+        let c = scan.coverage;
+        assert_eq!(c.dicom_files, 1, "{c:?}");
+        assert_eq!(c.text_files, 1, "{c:?}");
+        // SOP class/instance UIDs plus the description, and the two text lines
+        assert!(c.values >= 4, "{c:?}");
+        assert!(c.bytes > 0, "{c:?}");
+        assert_eq!(c.skipped_binary, 1, "the OW element must be counted: {c:?}");
     }
 
     #[test]
@@ -636,8 +713,12 @@ mod tests {
             ]),
         );
 
+        let mut coverage = Coverage::default();
         let mut seen = Vec::new();
-        for_each_text_value(d.path(), &mut |_file, tag, _vr, _text| seen.push(tag)).unwrap();
+        for_each_text_value(d.path(), &mut coverage, &mut |_file, tag, _vr, _text| {
+            seen.push(tag)
+        })
+        .unwrap();
 
         assert!(
             !seen.contains(&Tag(0x7FE0, 0x0010)),
@@ -669,10 +750,11 @@ mod tests {
         );
 
         let fp = fingerprint(&["Doe".to_string()], "pepper");
-        let hits = scan_fingerprint(d.path(), &fp).unwrap();
+        let scan = scan_fingerprint(d.path(), &fp).unwrap();
         assert!(
-            hits.is_empty(),
-            "binary values must not be scanned as text: {hits:?}"
+            scan.hits.is_empty(),
+            "binary values must not be scanned as text: {:?}",
+            scan.hits
         );
     }
 

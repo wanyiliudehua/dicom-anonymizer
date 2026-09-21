@@ -937,6 +937,40 @@ fn verbose_reports_progress_but_the_default_is_quiet() {
 }
 
 #[test]
+fn verify_reports_the_scope_of_its_search() {
+    // "0 hits" is only meaningful with its scope, so the report says how much text was
+    // read and that binary values (pixel data) are not searched at all.
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    common::write_fixture(&src.path().join("one.dcm"), "Doe^John", "1.2.3");
+    let dir = tempfile::tempdir().unwrap();
+    let fp = dir.path().join("ids.json");
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(src.path())
+        .args(["-o"])
+        .arg(out.path())
+        .args(["--export-identifiers"])
+        .arg(&fp)
+        .assert()
+        .success();
+
+    Command::cargo_bin("dicom-anonymizer")
+        .unwrap()
+        .args(["-i"])
+        .arg(out.path())
+        .args(["--verify"])
+        .arg(&fp)
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("coverage:").and(predicate::str::contains("not searched")),
+        );
+}
+
+#[test]
 fn dry_run_writes_no_files() {
     let src = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();

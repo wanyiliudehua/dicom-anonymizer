@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--verify` now reports its **coverage**: files searched, text values and bytes examined,
+  and how many non-text values were deliberately not searched. Only text VRs are searched,
+  so "0 hits" is a bounded claim instead of a blanket all-clear — on the sample tree it
+  reads `5439 text value(s), 77.8 KB searched; 939 non-text value(s) not searched`.
 - Progress reporting on stderr: a line every couple of seconds with the file count,
   throughput and ETA, plus a final line. Shown when stderr is a terminal, or always with
   `--verbose`; redirected output stays quiet, so existing logs are unchanged. Emitted from

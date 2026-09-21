@@ -354,14 +354,16 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path, require_complete:
         }
     }
 
-    let hits = match verify::scan_fingerprint(input, &fp) {
-        Ok(h) => h,
+    let scan = match verify::scan_fingerprint(input, &fp) {
+        Ok(s) => s,
         Err(e) => {
             eprintln!("error: cannot scan {}: {e}", input.display());
             return 2;
         }
     };
-    for h in &hits {
+    let hits = &scan.hits;
+    let coverage = &scan.coverage;
+    for h in hits {
         match h.location {
             verify::Location::Tag(t) => eprintln!(
                 "leak: {} ({:04X},{:04X}) contains `{}`",
@@ -384,6 +386,16 @@ fn run_verify(input: &std::path::Path, path: &std::path::Path, require_complete:
         hits.len(),
         fp.hashes.len(),
         input.display()
+    );
+    // "0 hits" is only meaningful with its scope, including what was not searched.
+    eprintln!(
+        "coverage: {} DICOM + {} text file(s); {} text value(s), {:.1} KB searched; \
+         {} non-text value(s) not searched",
+        coverage.dicom_files,
+        coverage.text_files,
+        coverage.values,
+        coverage.bytes as f64 / 1024.0,
+        coverage.skipped_binary
     );
     if tree_ok && hits.is_empty() {
         0
