@@ -30,6 +30,29 @@ fn is_date_tag(tag: Tag) -> bool {
     DATE_TAGS.contains(&tag)
 }
 
+/// A dummy value that is valid for common value representations (E.1-1 `D`).
+fn dummy_for(vr: VR, fallback: &str) -> String {
+    match vr {
+        VR::DA => "19000101".to_string(),
+        VR::DT => "19000101000000".to_string(),
+        VR::TM => "000000".to_string(),
+        _ => fallback.to_string(),
+    }
+}
+
+/// E.1-1 repeating-group attributes that cannot be a single tag:
+/// Curve Data `(50xx,xxxx)` and Overlay Data/Comments `(60xx,3000|4000)`.
+fn repeating_group_action(tag: Tag) -> Option<Action> {
+    let g = tag.0;
+    if (0x5000..=0x50FF).contains(&g) {
+        return Some(Action::X);
+    }
+    if (0x6000..=0x60FF).contains(&g) && (tag.1 == 0x3000 || tag.1 == 0x4000) {
+        return Some(Action::X);
+    }
+    None
+}
+
 /// Apply the effective rules to `obj`, recursing into sequences.
 /// Returns the number of elements changed.
 pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
@@ -54,7 +77,10 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
             continue;
         }
 
-        let action = rules.get(&tag).copied();
+        let action = rules
+            .get(&tag)
+            .copied()
+            .or_else(|| repeating_group_action(tag));
 
         // An explicit X removes the element as a whole — including a sequence.
         if action == Some(Action::X) {
@@ -86,10 +112,7 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                     }
                     continue;
                 }
-                DateStrategy::Shift
-                    if ctx.cfg.profile.retain_longitudinal_temporal
-                        || action != Action::Z =>
-                {
+                DateStrategy::Shift if ctx.cfg.profile.retain_longitudinal_temporal => {
                     if let Some(v) = ds::get_string(obj, tag) {
                         let shifted = match v.len() {
                             8 => ctx.dates.shift_da(&v, offset),
@@ -115,14 +138,19 @@ pub fn apply(obj: &mut InMemDicomObject, ctx: &DeidContext) -> Result<usize> {
                 }
             }
             Action::D => {
-                let dummy = ctx
-                    .cfg
-                    .dummies
-                    .get(&format!("{:04X},{:04X}", tag.0, tag.1))
-                    .cloned()
-                    .unwrap_or_else(|| "ANONYMOUS".to_string());
                 let vr = obj.element(tag).map(|e| e.vr()).unwrap_or(VR::LO);
-                ds::set_string(obj, tag, vr, &dummy);
+                let value = if vr == VR::UI {
+                    ctx.uids.map(&format!("{:04X}{:04X}", tag.0, tag.1))
+                } else {
+                    let fallback = ctx
+                        .cfg
+                        .dummies
+                        .get(&format!("{:04X},{:04X}", tag.0, tag.1))
+                        .cloned()
+                        .unwrap_or_else(|| "ANONYMOUS".to_string());
+                    dummy_for(vr, &fallback)
+                };
+                ds::set_string(obj, tag, vr, &value);
                 changed += 1;
             }
             Action::U => {
@@ -193,7 +221,10 @@ mod tests {
             crate::deid::dataset::get_string(&o, Tag(0x0010, 0x0010)).as_deref(),
             Some("Doe^John")
         );
-        assert_eq!(crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0080)), None);
+        assert_ne!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0080)).as_deref(),
+            Some("General Hospital")
+        );
     }
 
     #[test]
@@ -352,12 +383,47 @@ mod tests {
             "1.2.3",
         )]);
         let mut o = InMemDicomObject::from_element_iter([DataElement::new(
-            Tag(0x0008, 0x1140),
+            Tag(0x0008, 0x1115),
             VR::SQ,
             DataSetSequence::from(vec![inner]),
         )]);
         apply(&mut o, &c).unwrap();
         // unruled sequence is kept (recursed into, not removed)
-        assert!(o.element(Tag(0x0008, 0x1140)).is_ok());
+        assert!(o.element(Tag(0x0008, 0x1115)).is_ok());
+    }
+
+    #[test]
+    fn dummy_action_writes_vr_valid_value() {
+        let cfg = Config::from_toml_str("[dates]\nstrategy = \"zero\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        // Series Date is `D` in E.1-1; a dummy DA must be a valid date.
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x0008, 0x0021),
+            VR::DA,
+            "20240101",
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert_eq!(
+            crate::deid::dataset::get_string(&o, Tag(0x0008, 0x0021)).as_deref(),
+            Some("19000101")
+        );
+    }
+
+    #[test]
+    fn repeating_group_overlay_data_is_removed() {
+        use dicom_core::PrimitiveValue;
+        let cfg = Config::from_toml_str("[dates]\nstrategy = \"zero\"\n").unwrap();
+        let u = UidMapper::new("2.25.", b"s");
+        let d = DateShifter::new(b"s", 10);
+        let c = ctx(&cfg, &u, &d);
+        let mut o = InMemDicomObject::from_element_iter([DataElement::new(
+            Tag(0x6000, 0x3000),
+            VR::OW,
+            PrimitiveValue::U16(vec![1u16].into()),
+        )]);
+        apply(&mut o, &c).unwrap();
+        assert!(o.element(Tag(0x6000, 0x3000)).is_err());
     }
 }

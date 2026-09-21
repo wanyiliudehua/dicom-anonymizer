@@ -50,6 +50,23 @@ the output directory has one JSON object per file (status, changed tag count,
 masked-region count, transfer syntaxes, output SHA-256). Exit codes: `0` success,
 `1` partial failure, `2` fatal error.
 
+## De-identification table
+
+The base rule table is the **full PS3.15 Table E.1-1** (Basic Application Level
+Confidentiality Profile, ~650 attributes), generated from the standard by
+`scripts/gen_e1_1.py` into `src/deid/e1_1.rs`. Ambiguous `Basic Prof.` cells
+(e.g. `X/Z`, `X/Z/D`) are collapsed to one action, preferring `Z` (keeps the
+element present, valid for Type 1/2 attributes). A few attributes not listed in
+E.1-1 are added as overrides (Manufacturer, Manufacturer Model Name, Software
+Versions); `SOP Class UID`, `Pixel Data` and `Burned In Annotation` are pinned
+to keep. Repeating-group rows that cannot be a single tag — Curve Data
+`(50xx,xxxx)`, Overlay Data/Comments `(60xx,3000|4000)` — are handled as ranges,
+and private (odd-group) tags are always removed.
+
+Date shifting is applied **only** with `[profile] retain_longitudinal_temporal =
+true`; otherwise each date/time attribute takes its E.1-1 action (`Z`, `D`, or
+`X`).
+
 ## Limits
 
 Irreversible by design. JPEG-LS requires `--features charls`. DICOMDIR files
