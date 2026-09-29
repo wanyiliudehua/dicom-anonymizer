@@ -1,4 +1,14 @@
 /target
 
-# real test data (never commit PHI)
-1.2.276.0.7230010.3.1.2.2843334150.21124.1789818734.943/
+# Real clinical data — never commit PHI.
+#
+# These are patterns rather than exact names. An exact-name rule let a stray
+# clinical JPEG 2000 image be swept in by `git add -A` and live in history, so
+# medical image formats are now denied by default. For a genuinely public sample,
+# add it deliberately and visibly: `git add -f <path>`.
+*.dcm
+*.jp2
+*.j2k
+DICOMDIR
+1.2.*/
+1.3.*/
