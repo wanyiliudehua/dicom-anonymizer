@@ -200,6 +200,6 @@ Initial release.
 - `PlanarConfiguration = 1` colour images are rejected when pixel masking is
   required.
 
-[Unreleased]: https://github.com/OWNER/REPO/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/OWNER/REPO/releases/tag/v0.2.0
-[0.1.0]: https://github.com/OWNER/REPO/releases/tag/v0.1.0
+[Unreleased]: https://github.com/wanyiliudehua/dicom-anonymizer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/wanyiliudehua/dicom-anonymizer/releases/tag/v0.2.0
+[0.1.0]: https://github.com/wanyiliudehua/dicom-anonymizer/releases/tag/v0.1.0
