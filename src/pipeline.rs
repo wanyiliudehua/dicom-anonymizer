@@ -9,7 +9,6 @@ use crate::deid::uids::UidMapper;
 use crate::discovery::Job;
 use crate::error::{AnonError, Result};
 use crate::pixel::stage;
-use crate::writer;
 use dicom_core::{Tag, VR};
 use dicom_object::InMemDicomObject;
 use std::io::Write;
@@ -228,7 +227,7 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         return Ok(rec);
     }
 
-    let target = writer::output_path(&shared.out_root, &out_rel);
+    let target = shared.out_root.join(&out_rel);
     if let Some(parent) = target.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             let rec = Record::error(rel_str(&out_rel), format!("mkdir: {e}"));

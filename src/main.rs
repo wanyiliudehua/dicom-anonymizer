@@ -8,7 +8,6 @@ mod pipeline;
 mod pixel;
 mod report;
 mod verify;
-mod writer;
 
 use clap::Parser;
 use pipeline::Shared;
