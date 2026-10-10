@@ -3,7 +3,6 @@
 use crate::error::Result;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Job {
@@ -29,24 +28,36 @@ pub fn is_dicom_file(path: &Path) -> bool {
 
 /// Walk `input`, returning one job per file (DICOM and non-DICOM) with its
 /// relative path. Non-DICOM files are reported so the audit can log them.
+///
+/// ponytail: unreadable directories are skipped, matching the walker this
+/// replaced; make them loud if a skipped subtree ever needs to be auditable.
 pub fn discover(input: &Path) -> Result<Vec<Job>> {
     let mut jobs = Vec::new();
-    for entry in WalkDir::new(input)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if !entry.file_type().is_file() {
+    let mut dirs = vec![input.to_path_buf()];
+    while let Some(dir) = dirs.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
+        };
+        for entry in entries.flatten() {
+            // `file_type` does not follow symlinks, so a linked directory is not
+            // descended into and a linked file is not reported - the same rule the
+            // previous walker applied with follow_links(false).
+            let Ok(ft) = entry.file_type() else { continue };
+            let path = entry.path();
+            if ft.is_dir() {
+                dirs.push(path);
+            } else if ft.is_file() {
+                let rel = path.strip_prefix(input).unwrap_or(&path).to_path_buf();
+                let dicom = is_dicom_file(&path);
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                jobs.push(Job {
+                    input: path,
+                    rel,
+                    dicom,
+                    size,
+                });
+            }
         }
-        let path = entry.path();
-        let rel = path.strip_prefix(input).unwrap_or(path).to_path_buf();
-        jobs.push(Job {
-            input: path.to_path_buf(),
-            rel,
-            dicom: is_dicom_file(path),
-            size: entry.metadata().map(|m| m.len()).unwrap_or(0),
-        });
     }
     jobs.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(jobs)
