@@ -575,8 +575,8 @@ dicom-anonymizer/
 
 ## 20. Implementation deltas from the approved plan
 
-The plan (`docs/superpowers/plans/2026-09-21-dicom-anonymizer.md`) was executed inline
-with TDD; the following deviations were ruled and recorded in the execution ledger:
+The plan was executed inline with TDD and is not kept in the tree; this section
+plus `CHANGELOG.md` and `git log` are the record. The following were ruled:
 
 - **Full E.1-1 port replaced the curated table.** The plan started with a ~55-attribute
   curated subset; it was replaced by the complete 653-attribute table, generated from
