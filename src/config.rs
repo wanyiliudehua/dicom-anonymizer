@@ -134,33 +134,25 @@ pub enum Frames {
     List(Vec<u32>),
 }
 
+/// Wire form of [`Frames`]: the string `"all"` or a list of frame indices.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FramesRepr {
+    Named(String),
+    List(Vec<u32>),
+}
+
 impl<'de> Deserialize<'de> for Frames {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-        struct V;
-        impl<'de> serde::de::Visitor<'de> for V {
-            type Value = Frames;
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("\"all\" or a list of frame indices")
+        Ok(match FramesRepr::deserialize(d)? {
+            FramesRepr::Named(s) if s == "all" => Frames::All,
+            FramesRepr::Named(s) => {
+                return Err(serde::de::Error::custom(format!(
+                    "expected \"all\", got {s:?}"
+                )))
             }
-            fn visit_str<E: serde::de::Error>(self, s: &str) -> std::result::Result<Frames, E> {
-                if s == "all" {
-                    Ok(Frames::All)
-                } else {
-                    Err(E::custom("expected \"all\""))
-                }
-            }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> std::result::Result<Frames, A::Error> {
-                let mut v = Vec::new();
-                while let Some(x) = seq.next_element::<u32>()? {
-                    v.push(x);
-                }
-                Ok(Frames::List(v))
-            }
-        }
-        d.deserialize_any(V)
+            FramesRepr::List(v) => Frames::List(v),
+        })
     }
 }
 
