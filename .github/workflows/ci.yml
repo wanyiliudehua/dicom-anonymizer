@@ -25,13 +25,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # `.cargo/config.toml` is host-specific (it pins the gnullvm target and
-      # absolute paths for a machine without a working MinGW/MSVC linker). CI
-      # runners have a normal toolchain, so drop it and build natively.
-      - name: Drop host-specific cargo config
-        shell: bash
-        run: rm -f .cargo/config.toml
-
       - name: Format
         run: cargo fmt --all -- --check
 

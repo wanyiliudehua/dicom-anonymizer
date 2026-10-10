@@ -11,15 +11,17 @@ Level Confidentiality Profile + options), with tag-driven burned-in pixel maskin
     # JPEG-LS support (needs CharLS + a C toolchain):
     cargo build --release --features charls
 
-The release binary is written to
-`target/x86_64-pc-windows-gnullvm/release/dicom-anonymizer.exe`.
+The release binary is written to `target/release/` (or
+`target/<triple>/release/` when a target is pinned).
 
 ### Windows toolchain note
 
-This repository's `.cargo/config.toml` targets `x86_64-pc-windows-gnullvm`
-because the host has no working MinGW `dlltool` and no MSVC linker. It uses a
-thin `rust-lld` wrapper that selects the correct CRT object per crate type,
-reusing the GNU target's MinGW import libraries. Regenerate that wrapper with:
+`.cargo/config.toml` is deliberately **not** committed: a committed
+`[build] target` would override the target chosen by everyone else building this
+repo. On a host with no working MinGW `dlltool` and no MSVC linker it pins
+`x86_64-pc-windows-gnullvm` and installs a thin `rust-lld` wrapper that selects
+the correct CRT object per crate type, reusing the GNU target's MinGW import
+libraries. Generate it locally with:
 
     scripts/setup-toolchain.sh
 

@@ -30,11 +30,6 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # Host-specific config (gnullvm target + absolute paths) must not apply here.
-      - name: Drop host-specific cargo config
-        shell: bash
-        run: rm -f .cargo/config.toml
-
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
