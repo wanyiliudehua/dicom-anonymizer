@@ -5,7 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] - 2026-10-10
+
+Repository and dependency hygiene, plus the cuts that came out of a whole-repo
+over-engineering review. Nothing changes in what is written: the sample tree still
+reports `ok=69 skipped=1 unsupported=0 error=0`, the leak check still reads
+`0 hit(s) from 19 identifier(s)`, and `--verify` output is unchanged.
+
+### Changed
+
+- Discovery walks the input tree with `std::fs::read_dir` instead of `walkdir`, with
+  the same semantics: symlinks are not followed, an unreadable directory is skipped,
+  and results are sorted by relative path. Three crates leave the build graph
+  (`walkdir`, `same-file`, `winapi-util`).
+- One SHA-256 helper instead of two near-identical ones. The salted form is now the
+  plain form plus its salt, and it no longer builds an intermediate string —
+  `--verify` hashes every window of every text value, so that allocation sat on a
+  hot path.
+- `[pixels.regions] frames` is parsed through serde's untagged representation rather
+  than a hand-written visitor. The accepted inputs and the error text for a wrong
+  string are unchanged.
+- `thiserror` stays on 1.x, which the `openjp2` stack already requires. The `2.0.20`
+  entries in `Cargo.lock` were stale — present in the lock but absent from the build
+  graph — so they were not a second major to consolidate onto.
+
+### Removed
+
+- `.cargo/config.toml` is no longer tracked, and the two `rm -f` steps that existed
+  only to undo it in `ci.yml` and `release.yml` are gone with it. It pinned this
+  host's target and absolute linker paths, so building the repository from git forced
+  a target meant for one machine; `scripts/setup-toolchain.sh` still regenerates it
+  locally. This is the one change a consumer can notice.
+- The executed 3094-line implementation plan. The design spec, this file and
+  `git log` are the record.
+- The one-caller `writer::output_path` wrapper, which was `Path::join`.
 
 ## [0.2.0] - 2026-09-22
 
@@ -200,6 +233,7 @@ Initial release.
 - `PlanarConfiguration = 1` colour images are rejected when pixel masking is
   required.
 
-[Unreleased]: https://github.com/wanyiliudehua/dicom-anonymizer/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/wanyiliudehua/dicom-anonymizer/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/wanyiliudehua/dicom-anonymizer/releases/tag/v0.2.1
 [0.2.0]: https://github.com/wanyiliudehua/dicom-anonymizer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/wanyiliudehua/dicom-anonymizer/releases/tag/v0.1.0
