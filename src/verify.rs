@@ -308,14 +308,19 @@ fn snippet(line: &str, matched: &str) -> String {
     out
 }
 
-/// Salted SHA-256 as lowercase hex.
-fn hash_hex(salt: &str, value: &str) -> String {
+/// Lowercase hex SHA-256 over `parts`, concatenated without separators.
+pub fn sha256_hex(parts: &[&[u8]]) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
-    h.update(salt.as_bytes());
-    h.update(b":");
-    h.update(value.as_bytes());
+    for p in parts {
+        h.update(p);
+    }
     format!("{:x}", h.finalize())
+}
+
+/// Salted SHA-256 as lowercase hex.
+fn hash_hex(salt: &str, value: &str) -> String {
+    sha256_hex(&[salt.as_bytes(), b":", value.as_bytes()])
 }
 
 /// Whether a value representation holds human-readable text.

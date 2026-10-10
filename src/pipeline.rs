@@ -9,6 +9,7 @@ use crate::deid::uids::UidMapper;
 use crate::discovery::Job;
 use crate::error::{AnonError, Result};
 use crate::pixel::stage;
+use crate::verify;
 use dicom_core::{Tag, VR};
 use dicom_object::InMemDicomObject;
 use std::io::Write;
@@ -251,17 +252,12 @@ pub fn process_job(shared: &Shared, job: &Job, log: &mut impl Write) -> Result<R
         emit(log, &rec);
         return Ok(rec);
     }
-    rec.output_sha256 = std::fs::read(&target).ok().map(|b| sha256_hex(&b));
+    rec.output_sha256 = std::fs::read(&target)
+        .ok()
+        .map(|b| verify::sha256_hex(&[&b]));
     rec.duration_ms = start.elapsed().as_millis();
     emit(log, &rec);
     Ok(rec)
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut h = Sha256::new();
-    h.update(bytes);
-    format!("{:x}", h.finalize())
 }
 
 #[cfg(test)]
